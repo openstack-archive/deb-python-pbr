@@ -7,3 +7,9 @@ export OSLO_PACKAGE_VERSION=$(VERSION)
 
 %:
 	dh $@  --with python2
+
+override_dh_clean:
+	dh_clean
+	# This is for a cowbuilder, as it's downloading this on clean
+	# there...
+	rm -rf d2to1-*-py*egg
