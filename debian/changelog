@@ -1,0 +1,5 @@
+python-pbr (0.5.16-1) unstable; urgency=low
+
+  * Initial release. (Closes: #712173)
+
+ -- Thomas Goirand <zigo@debian.org>  Fri, 14 Jun 2013 02:59:11 +0800
