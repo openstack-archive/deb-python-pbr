@@ -3,5 +3,7 @@
 UPSTREAM_GIT = git://github.com/openstack-dev/pbr.git
 include /usr/share/openstack-pkg-tools/pkgos.make
 
+export OSLO_PACKAGE_VERSION=$(VERSION)
+
 %:
 	dh $@  --with python2
