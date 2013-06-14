@@ -1,3 +1,10 @@
+python-pbr (0.5.16-3) unstable; urgency=low
+
+  * Reviewed short and long description.
+  * Fixed python3 dependencies (there was none).
+
+ -- Thomas Goirand <zigo@debian.org>  Sat, 15 Jun 2013 01:57:23 +0800
+
 python-pbr (0.5.16-2) unstable; urgency=low
 
   * Fixed a bit debian/copyright.
