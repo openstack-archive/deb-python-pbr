@@ -1,3 +1,10 @@
+python-pbr (0.5.16-2) unstable; urgency=low
+
+  * Fixed a bit debian/copyright.
+  * Added many missing build-dependencies.
+
+ -- Thomas Goirand <zigo@debian.org>  Fri, 14 Jun 2013 14:56:22 +0800
+
 python-pbr (0.5.16-1) unstable; urgency=low
 
   * Initial release. (Closes: #712173)

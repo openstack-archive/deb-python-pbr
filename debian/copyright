@@ -1,5 +1,6 @@
 Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: pbr
+Upstream-Contact: OpenStack Devel <openstack-dev@lists.openstack.org>
 Source: http://pypi.python.org/pypi/pbr
 
 Files: debian/*
@@ -7,7 +8,11 @@ Copyright: (c) 2013, Thomas Goirand <zigo@debian.org>
 License: Apache-2
 
 Files: *
-Copyright: Andrew Bogott <abogott@wikimedia.org>
+Copyright: 2011, OpenStack LLC.
+ 2011-2012, OpenStack Foundation
+ 2013, Hewlett-Packard Development Company, L.P.
+ 2012 Red Hat, Inc.
+ Andrew Bogott <abogott@wikimedia.org>
  Angus Salkeld <asalkeld@redhat.com>
  Anthony Young <sleepsonthefloor@gmail.com>
  Bhuvan Arumugam <bhuvan@apache.org>

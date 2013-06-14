@@ -10,8 +10,18 @@ Uploaders: Loic Dachary (OuoU) <loic@debian.org>,
 Build-Depends: debhelper (>= 9),
                openstack-pkg-tools,
                python-all (>= 2.6.6-3~),
+               python-coverage,
                python-d2to1 (>= 0.2.10),
-               python-setuptools
+               python-discover,
+               python-fixtures,
+               python-setuptools,
+               python-setuptools-git,
+               python-sphinx,
+               python-subunit,
+               python-testrepository (>= 0.0.14),
+               python-testresources,
+               python-testtools,
+               subunit
 Standards-Version: 3.9.4
 Vcs-Browser: http://anonscm.debian.org/gitweb/?p=openstack/python-pbr.git
 Vcs-Git: git://anonscm.debian.org/openstack/python-pbr.git
