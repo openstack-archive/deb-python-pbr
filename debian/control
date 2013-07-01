@@ -21,6 +21,7 @@ Build-Depends: debhelper (>= 9),
                python-testresources,
                python-testtools,
                python3-all,
+               python3-d2to1 (>= 0.2.10),
                python3-setuptools,
                subunit
 Standards-Version: 3.9.4
