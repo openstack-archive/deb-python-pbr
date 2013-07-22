@@ -26,7 +26,6 @@ import re
 import subprocess
 import sys
 
-from d2to1.extern import six
 from distutils.command import install as du_install
 import distutils.errors
 from distutils import log
@@ -34,9 +33,18 @@ import pkg_resources
 from setuptools.command import install
 from setuptools.command import sdist
 
+try:
+    import cStringIO as io
+except ImportError:
+    import io
+
 log.set_verbosity(log.INFO)
 TRUE_VALUES = ('true', '1', 'yes')
 REQUIREMENTS_FILES = ('requirements.txt', 'tools/pip-requires')
+TEST_REQUIREMENTS_FILES = ('test-requirements.txt', 'tools/test-requires')
+# part of the standard library starting with 2.7
+# adding it to the requirements list screws distro installs
+BROKEN_ON_27 = ('argparse', 'importlib')
 
 
 def append_text_list(config, key, text_list):
@@ -84,16 +92,20 @@ def _missing_requires(requires):
 
 
 def _pip_install(links, requires, root=None):
+    if str(os.getenv('SKIP_PIP_INSTALL', '')).lower() in TRUE_VALUES:
+        return
     root_cmd = ""
     if root:
         root_cmd = "--root=%s" % root
-    _run_shell_command(
-        "%s -m pip install %s %s %s" % (
-            sys.executable,
-            root_cmd,
-            " ".join(links),
-            " ".join(_wrap_in_quotes(_missing_requires(requires)))),
-        throw_on_error=True, buffer=False)
+    missing_requires = _missing_requires(requires)
+    if missing_requires:
+        _run_shell_command(
+            "%s -m pip.__init__ install %s %s %s" % (
+                sys.executable,
+                root_cmd,
+                " ".join(links),
+                " ".join(_wrap_in_quotes(missing_requires))),
+            throw_on_error=True, buffer=False)
 
 
 def read_git_mailmap(git_dir, mailmap='.mailmap'):
@@ -107,21 +119,31 @@ def canonicalize_emails(changelog, mapping):
     """Takes in a string and an email alias mapping and replaces all
        instances of the aliases in the string with their real email.
     """
-    for alias, email_address in six.iteritems(mapping):
+    for alias, email_address in mapping.items():
         changelog = changelog.replace(alias, email_address)
     return changelog
 
 
+def _any_existing(file_list):
+    return [f for f in file_list if os.path.exists(f)]
+
+
 # Get requirements from the first file that exists
 def get_reqs_from_files(requirements_files):
-    for requirements_file in requirements_files:
-        if os.path.exists(requirements_file):
-            with open(requirements_file, 'r') as fil:
-                return fil.read().split('\n')
+    for requirements_file in _any_existing(requirements_files):
+        with open(requirements_file, 'r') as fil:
+            return fil.read().split('\n')
     return []
 
 
-def parse_requirements(requirements_files=REQUIREMENTS_FILES):
+def parse_requirements(requirements_files=None):
+
+    if requirements_files is None:
+        files = os.environ.get("PBR_REQUIREMENTS_FILES")
+        if files:
+            requirements_files = tuple(f.strip() for f in files.split(','))
+        else:
+            requirements_files = REQUIREMENTS_FILES
 
     def egg_fragment(match):
         # take a versioned egg fragment and return a
@@ -133,6 +155,10 @@ def parse_requirements(requirements_files=REQUIREMENTS_FILES):
 
     requirements = []
     for line in get_reqs_from_files(requirements_files):
+        # Ignore comments
+        if (not line.strip()) or line.startswith('#'):
+            continue
+
         # For the requirements list, we need to inject only the portion
         # after egg= so that distutils knows the package it's looking for
         # such as:
@@ -152,9 +178,7 @@ def parse_requirements(requirements_files=REQUIREMENTS_FILES):
         # -f lines are for index locations, and don't get used here
         elif re.match(r'\s*-f\s+', line):
             pass
-        # argparse is part of the standard library starting with 2.7
-        # adding it to the requirements list screws distro installs
-        elif line == 'argparse' and sys.version_info >= (2, 7):
+        elif line in BROKEN_ON_27 and sys.version_info >= (2, 7):
             pass
         else:
             requirements.append(line)
@@ -220,8 +244,12 @@ def write_git_changelog(git_dir=None, dest_dir=os.path.curdir,
     should_skip = get_boolean_option(option_dict, 'skip_changelog',
                                      'SKIP_WRITE_GIT_CHANGELOG')
     if not should_skip:
-        log.info('[pbr] Writing ChangeLog')
         new_changelog = os.path.join(dest_dir, 'ChangeLog')
+        # If there's already a ChangeLog and it's not writable, just use it
+        if (os.path.exists(new_changelog)
+                and not os.access(new_changelog, os.W_OK)):
+            return
+        log.info('[pbr] Writing ChangeLog')
         if git_dir is None:
             git_dir = _get_git_directory()
         if git_dir:
@@ -238,10 +266,14 @@ def generate_authors(git_dir=None, dest_dir='.', option_dict=dict()):
     should_skip = get_boolean_option(option_dict, 'skip_authors',
                                      'SKIP_GENERATE_AUTHORS')
     if not should_skip:
-        log.info('[pbr] Generating AUTHORS')
-        jenkins_email = 'jenkins@review'
         old_authors = os.path.join(dest_dir, 'AUTHORS.in')
         new_authors = os.path.join(dest_dir, 'AUTHORS')
+        # If there's already an AUTHORS file and it's not writable, just use it
+        if (os.path.exists(new_authors)
+                and not os.access(new_authors, os.W_OK)):
+            return
+        log.info('[pbr] Generating AUTHORS')
+        jenkins_email = 'jenkins@review'
         if git_dir is None:
             git_dir = _get_git_directory()
         if git_dir:
@@ -261,11 +293,11 @@ def generate_authors(git_dir=None, dest_dir='.', option_dict=dict()):
 
             mailmap = read_git_mailmap(git_dir)
             with open(new_authors, 'wb') as new_authors_fh:
-                new_authors_fh.write(canonicalize_emails(
-                    changelog, mailmap).encode('utf-8'))
                 if os.path.exists(old_authors):
                     with open(old_authors, "rb") as old_authors_fh:
-                        new_authors_fh.write(b'\n' + old_authors_fh.read())
+                        new_authors_fh.write(old_authors_fh.read())
+                new_authors_fh.write(canonicalize_emails(
+                    changelog, mailmap).encode('utf-8'))
 
 
 _rst_template = """%(heading)s
@@ -310,6 +342,92 @@ class LocalInstall(install.install):
             _pip_install(links, self.distribution.install_requires, self.root)
 
         return du_install.install.run(self)
+
+
+def _newer_requires_files(egg_info_dir):
+    """Check to see if any of the requires files are newer than egg-info."""
+    for target, sources in (('requires.txt', REQUIREMENTS_FILES),
+                            ('test-requires.txt', TEST_REQUIREMENTS_FILES)):
+        target_path = os.path.join(egg_info_dir, target)
+        for src in _any_existing(sources):
+            if (not os.path.exists(target_path) or
+                    os.path.getmtime(target_path)
+                    < os.path.getmtime(src)):
+                return True
+    return False
+
+
+def _copy_test_requires_to(egg_info_dir):
+    """Copy the requirements file to egg-info/test-requires.txt."""
+    with open(os.path.join(egg_info_dir, 'test-requires.txt'), 'w') as dest:
+        for source in _any_existing(TEST_REQUIREMENTS_FILES):
+            dest.write(open(source, 'r').read().rstrip('\n') + '\n')
+
+
+class _PipInstallTestRequires(object):
+    """Mixin class to install test-requirements.txt before running tests."""
+
+    def install_test_requirements(self):
+
+        links = _make_links_args(
+            parse_dependency_links(TEST_REQUIREMENTS_FILES))
+        if self.distribution.tests_require:
+            _pip_install(links, self.distribution.tests_require)
+
+    def pre_run(self):
+        self.egg_name = pkg_resources.safe_name(self.distribution.get_name())
+        self.egg_info = "%s.egg-info" % pkg_resources.to_filename(
+            self.egg_name)
+        if (not os.path.exists(self.egg_info) or
+                _newer_requires_files(self.egg_info)):
+            ei_cmd = self.get_finalized_command('egg_info')
+            ei_cmd.run()
+            self.install_test_requirements()
+            _copy_test_requires_to(self.egg_info)
+
+try:
+    from pbr import testr_command
+
+    class TestrTest(testr_command.Testr, _PipInstallTestRequires):
+        """Make setup.py test do the right thing."""
+
+        command_name = 'test'
+
+        def run(self):
+            self.pre_run()
+            # Can't use super - base class old-style class
+            testr_command.Testr.run(self)
+
+    _have_testr = True
+
+except ImportError:
+    _have_testr = False
+
+
+def have_testr():
+    return _have_testr
+
+try:
+    from nose import commands
+
+    class NoseTest(commands.nosetests, _PipInstallTestRequires):
+        """Fallback test runner if testr is a no-go."""
+
+        command_name = 'test'
+
+        def run(self):
+            self.pre_run()
+            # Can't use super - base class old-style class
+            commands.nosetests.run(self)
+
+    _have_nose = True
+
+except ImportError:
+    _have_nose = False
+
+
+def have_nose():
+    return _have_nose
 
 
 class LocalSDist(sdist.sdist):
@@ -373,7 +491,7 @@ try:
 
         def _sphinx_run(self):
             if not self.verbose:
-                status_stream = six.StringIO()
+                status_stream = io.StringIO()
             else:
                 status_stream = sys.stdout
             confoverrides = {}
@@ -512,7 +630,9 @@ def get_version(package_name, pre_version=None):
     to make a source tarball from a fork of our repo with additional tags in it
     that they understand and desire the results of doing that.
     """
-    version = os.environ.get("OSLO_PACKAGE_VERSION", None)
+    version = os.environ.get(
+        "PBR_VERSION",
+        os.environ.get("OSLO_PACKAGE_VERSION", None))
     if version:
         return version
     version = _get_version_from_pkg_info(package_name)

@@ -22,7 +22,13 @@ import os
 import sys
 import tempfile
 
-from d2to1.extern import six
+try:
+    import cStringIO as io
+    BytesIO = io.StringIO
+except ImportError:
+    import io
+    BytesIO = io.BytesIO
+
 import fixtures
 import testscenarios
 
@@ -165,8 +171,8 @@ class GitLogsTest(tests.BaseTestCase):
             "os.path.exists",
             lambda path: os.path.abspath(path) in exist_files))
         self.useFixture(fixtures.FakePopen(lambda _: {
-            "stdout": six.BytesIO("Author: Foo Bar "
-                                  "<email@bar.com>\n".encode('utf-8'))
+            "stdout": BytesIO("Author: Foo Bar "
+                              "<email@bar.com>\n".encode('utf-8'))
         }))
 
         def _fake_read_git_mailmap(*args):
@@ -207,7 +213,7 @@ class GitLogsTest(tests.BaseTestCase):
             lambda path: os.path.abspath(path) in exist_files))
 
         self.useFixture(fixtures.FakePopen(lambda proc_args: {
-            "stdout": six.BytesIO(
+            "stdout": BytesIO(
                 self._fake_log_output(proc_args["args"][2], cmd_map))
         }))
 
@@ -314,9 +320,33 @@ class ParseRequirementsTest(tests.BaseTestCase):
         if sys.version_info >= (2, 7):
             self.assertEqual([], packaging.parse_requirements([self.tmp_file]))
 
+    def test_parse_requirements_override_with_env(self):
+        with open(self.tmp_file, 'w') as fh:
+            fh.write("foo\nbar")
+        self.useFixture(
+            fixtures.EnvironmentVariable('PBR_REQUIREMENTS_FILES',
+                                         self.tmp_file))
+        self.assertEqual(['foo', 'bar'],
+                         packaging.parse_requirements())
+
+    def test_parse_requirements_override_with_env_multiple_files(self):
+        with open(self.tmp_file, 'w') as fh:
+            fh.write("foo\nbar")
+        self.useFixture(
+            fixtures.EnvironmentVariable('PBR_REQUIREMENTS_FILES',
+                                         "no-such-file," + self.tmp_file))
+        self.assertEqual(['foo', 'bar'],
+                         packaging.parse_requirements())
+
     def test_get_requirement_from_file_empty(self):
         actual = packaging.get_reqs_from_files([])
         self.assertEqual([], actual)
+
+    def test_parse_requirements_with_comments(self):
+        with open(self.tmp_file, 'w') as fh:
+            fh.write("# this is a comment\nfoobar\n# and another one\nfoobaz")
+        self.assertEqual(['foobar', 'foobaz'],
+                         packaging.parse_requirements([self.tmp_file]))
 
 
 class ParseDependencyLinksTest(tests.BaseTestCase):
