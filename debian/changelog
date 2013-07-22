@@ -1,6 +1,7 @@
 python-pbr (0.5.19-1) unstable; urgency=low
 
   * New upstream release.
+  * Added missing build-depends: python-testscenarios.
 
  -- Thomas Goirand <zigo@debian.org>  Mon, 22 Jul 2013 14:23:33 +0800
 
