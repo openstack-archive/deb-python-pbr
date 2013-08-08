@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # Copyright (c) 2013 Hewlett-Packard Development Company, L.P.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,9 +13,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import setuptools
+from distutils import errors
+import os
 
-from pbr import util
+_extra_files = []
 
-setuptools.setup(
-    **util.cfg_to_args())
+
+def get_extra_files():
+    global _extra_files
+    return _extra_files
+
+
+def set_extra_files(extra_files):
+    # Let's do a sanity check
+    for filename in extra_files:
+        if not os.path.exists(filename):
+            raise errors.DistutilsFileError(
+                '%s from the extra_files option in setup.cfg does not '
+                'exist' % filename)
+    global _extra_files
+    _extra_files[:] = extra_files[:]

@@ -73,10 +73,12 @@ from setuptools.dist import Distribution
 from setuptools.extension import Extension
 
 try:
-    import configparser
-except ImportError:
     import ConfigParser as configparser
+except ImportError:
+    import configparser
 
+from pbr import extra_files
+import pbr.hooks
 
 # A simplified RE for this; just checks that the line ends with version
 # predicates in ()
@@ -219,7 +221,9 @@ def cfg_to_args(path='setup.cfg'):
 
     try:
         if setup_hooks:
-            setup_hooks = split_multiline(setup_hooks)
+            setup_hooks = [
+                hook for hook in split_multiline(setup_hooks)
+                if hook != 'pbr.hooks.setup_hook']
             for hook in setup_hooks:
                 hook_fn = resolve_name(hook)
                 try :
@@ -233,7 +237,14 @@ def cfg_to_args(path='setup.cfg'):
                     log.error(traceback.format_exc())
                     sys.exit(1)
 
+        # Run the pbr hook
+        pbr.hooks.setup_hook(config)
+
         kwargs = setup_cfg_to_setup_kwargs(config)
+
+        # Set default config overrides
+        kwargs['include_package_data'] = True
+        kwargs['zip_safe'] = False
 
         register_custom_compilers(config)
 
@@ -248,23 +259,9 @@ def cfg_to_args(path='setup.cfg'):
         wrap_commands(kwargs)
 
         # Handle the [files]/extra_files option
-        extra_files = has_get_option(config, 'files', 'extra_files')
-        if extra_files:
-            extra_files = split_multiline(extra_files)
-            # Let's do a sanity check
-            for filename in extra_files:
-                if not os.path.exists(filename):
-                    raise DistutilsFileError(
-                        '%s from the extra_files option in setup.cfg does not '
-                        'exist' % filename)
-            # Unfortunately the only really sensible way to do this is to
-            # monkey-patch the manifest_maker class
-            @monkeypatch_method(manifest_maker)
-            def add_defaults(self, extra_files=extra_files, log=log):
-                log.info('[d2to1] running patched manifest_maker command '
-                          'with extra_files support')
-                add_defaults._orig(self)
-                self.filelist.extend(extra_files)
+        files_extra_files = has_get_option(config, 'files', 'extra_files')
+        if files_extra_files:
+            extra_files.set_extra_files(split_multiline(files_extra_files))
 
     finally:
         # Perform cleanup if any paths were added to sys.path

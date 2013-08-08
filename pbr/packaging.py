@@ -30,13 +30,18 @@ from distutils.command import install as du_install
 import distutils.errors
 from distutils import log
 import pkg_resources
+from setuptools.command import easy_install
+from setuptools.command import egg_info
 from setuptools.command import install
+from setuptools.command import install_scripts
 from setuptools.command import sdist
 
 try:
     import cStringIO as io
 except ImportError:
     import io
+
+from pbr import extra_files
 
 log.set_verbosity(log.INFO)
 TRUE_VALUES = ('true', '1', 'yes')
@@ -45,6 +50,13 @@ TEST_REQUIREMENTS_FILES = ('test-requirements.txt', 'tools/test-requires')
 # part of the standard library starting with 2.7
 # adding it to the requirements list screws distro installs
 BROKEN_ON_27 = ('argparse', 'importlib')
+
+
+def get_requirements_files():
+    files = os.environ.get("PBR_REQUIREMENTS_FILES")
+    if files:
+        return tuple(f.strip() for f in files.split(','))
+    return REQUIREMENTS_FILES
 
 
 def append_text_list(config, key, text_list):
@@ -77,41 +89,30 @@ def _make_links_args(links):
     return ["-f '%s'" % link for link in links]
 
 
-def _missing_requires(requires):
-    """Return the list of requirements that are not already installed.
-
-    Do this check explicitly, because it's very easy to see if a package
-    is in the current working set, to avoid shelling out to pip and attempting
-    an install. pip will do the right thing, but we don't need to do the
-    excess work on everyone's machines all the time (especially since tox
-    likes re-installing things a lot)
-    """
-    return [r for r in requires
-            if not pkg_resources.working_set.find(
-                pkg_resources.Requirement.parse(r))]
-
-
-def _pip_install(links, requires, root=None):
-    if str(os.getenv('SKIP_PIP_INSTALL', '')).lower() in TRUE_VALUES:
+def _pip_install(links, requires, root=None, option_dict=dict()):
+    if get_boolean_option(
+            option_dict, 'skip_pip_install', 'SKIP_PIP_INSTALL'):
         return
     root_cmd = ""
     if root:
         root_cmd = "--root=%s" % root
-    missing_requires = _missing_requires(requires)
-    if missing_requires:
-        _run_shell_command(
-            "%s -m pip.__init__ install %s %s %s" % (
-                sys.executable,
-                root_cmd,
-                " ".join(links),
-                " ".join(_wrap_in_quotes(missing_requires))),
-            throw_on_error=True, buffer=False)
+    _run_shell_command(
+        "%s -m pip.__init__ install %s %s %s" % (
+            sys.executable,
+            root_cmd,
+            " ".join(links),
+            " ".join(_wrap_in_quotes(requires))),
+        throw_on_error=True, buffer=False)
 
 
-def read_git_mailmap(git_dir, mailmap='.mailmap'):
-    mailmap = os.path.join(git_dir, mailmap)
+def read_git_mailmap(root_dir=None, mailmap='.mailmap'):
+    if not root_dir:
+        root_dir = _run_shell_command('git rev-parse --show-toplevel')
+
+    mailmap = os.path.join(root_dir, mailmap)
     if os.path.exists(mailmap):
         return _parse_mailmap(open(mailmap, 'r').readlines())
+
     return dict()
 
 
@@ -139,11 +140,7 @@ def get_reqs_from_files(requirements_files):
 def parse_requirements(requirements_files=None):
 
     if requirements_files is None:
-        files = os.environ.get("PBR_REQUIREMENTS_FILES")
-        if files:
-            requirements_files = tuple(f.strip() for f in files.split(','))
-        else:
-            requirements_files = REQUIREMENTS_FILES
+        requirements_files = get_requirements_files()
 
     def egg_fragment(match):
         # take a versioned egg fragment and return a
@@ -186,7 +183,9 @@ def parse_requirements(requirements_files=None):
     return requirements
 
 
-def parse_dependency_links(requirements_files=REQUIREMENTS_FILES):
+def parse_dependency_links(requirements_files=None):
+    if requirements_files is None:
+        requirements_files = get_requirements_files()
     dependency_links = []
     # dependency_links inject alternate locations to find packages listed
     # in requirements
@@ -224,7 +223,7 @@ def _run_shell_command(cmd, throw_on_error=False, buffer=True):
         raise distutils.errors.DistutilsError(
             "%s returned %d" % (cmd, output.returncode))
     if len(out) == 0 or not out[0] or not out[0].strip():
-        return None
+        return ''
     return out[0].strip().decode('utf-8')
 
 
@@ -255,7 +254,7 @@ def write_git_changelog(git_dir=None, dest_dir=os.path.curdir,
         if git_dir:
             git_log_cmd = 'git --git-dir=%s log' % git_dir
             changelog = _run_shell_command(git_log_cmd)
-            mailmap = read_git_mailmap(git_dir)
+            mailmap = read_git_mailmap()
             with open(new_changelog, "wb") as changelog_file:
                 changelog_file.write(canonicalize_emails(
                     changelog, mailmap).encode('utf-8'))
@@ -273,31 +272,57 @@ def generate_authors(git_dir=None, dest_dir='.', option_dict=dict()):
                 and not os.access(new_authors, os.W_OK)):
             return
         log.info('[pbr] Generating AUTHORS')
-        jenkins_email = 'jenkins@review'
+        ignore_emails = '(jenkins@review|infra@lists)'
         if git_dir is None:
             git_dir = _get_git_directory()
         if git_dir:
+            authors = []
+
             # don't include jenkins email address in AUTHORS file
             git_log_cmd = ("git --git-dir=" + git_dir +
-                           " log --format='%aN <%aE>' | sort -u | "
-                           "egrep -v '" + jenkins_email + "'")
-            changelog = _run_shell_command(git_log_cmd)
-            signed_cmd = ("git log --git-dir=" + git_dir +
-                          " | grep -i Co-authored-by: | sort -u")
-            signed_entries = _run_shell_command(signed_cmd)
-            if signed_entries:
-                new_entries = "\n".join(
-                    [signed.split(":", 1)[1].strip()
-                     for signed in signed_entries.split("\n") if signed])
-                changelog = "\n".join((changelog, new_entries))
+                           " log --format='%aN <%aE>'"
+                           " | egrep -v '" + ignore_emails + "'")
+            authors += _run_shell_command(git_log_cmd).split('\n')
 
+            # get all co-authors from commit messages
+            co_authors_cmd = ("git log --git-dir=" + git_dir +
+                              " | grep -i Co-authored-by:")
+            co_authors = _run_shell_command(co_authors_cmd)
+
+            co_authors = [signed.split(":", 1)[1].strip()
+                          for signed in co_authors.split('\n') if signed]
+
+            authors += co_authors
+
+            # canonicalize emails, remove duplicates and sort
             mailmap = read_git_mailmap(git_dir)
+            authors = canonicalize_emails('\n'.join(authors), mailmap)
+            authors = authors.split('\n')
+            authors = sorted(set(authors))
+
             with open(new_authors, 'wb') as new_authors_fh:
                 if os.path.exists(old_authors):
                     with open(old_authors, "rb") as old_authors_fh:
                         new_authors_fh.write(old_authors_fh.read())
-                new_authors_fh.write(canonicalize_emails(
-                    changelog, mailmap).encode('utf-8'))
+                new_authors_fh.write(('\n'.join(authors) + '\n')
+                                     .encode('utf-8'))
+
+
+def _find_git_files(dirname='', git_dir=None):
+    """Behave like a file finder entrypoint plugin.
+
+    We don't actually use the entrypoints system for this because it runs
+    at absurd times. We only want to do this when we are building an sdist.
+    """
+    file_list = []
+    if git_dir is None:
+        git_dir = _get_git_directory()
+    if git_dir:
+        log.info("[pbr] In git context, generating filelist from git")
+        git_ls_cmd = "git --git-dir=%s ls-files -z" % git_dir
+        file_list = _run_shell_command(git_ls_cmd)
+        file_list = file_list.split(b'\x00'.decode('utf-8'))
+    return [f for f in file_list if f]
 
 
 _rst_template = """%(heading)s
@@ -336,17 +361,20 @@ class LocalInstall(install.install):
     command_name = 'install'
 
     def run(self):
+        option_dict = self.distribution.get_option_dict('pbr')
         if (not self.single_version_externally_managed
                 and self.distribution.install_requires):
             links = _make_links_args(self.distribution.dependency_links)
-            _pip_install(links, self.distribution.install_requires, self.root)
+            _pip_install(
+                links, self.distribution.install_requires, self.root,
+                option_dict=option_dict)
 
         return du_install.install.run(self)
 
 
 def _newer_requires_files(egg_info_dir):
     """Check to see if any of the requires files are newer than egg-info."""
-    for target, sources in (('requires.txt', REQUIREMENTS_FILES),
+    for target, sources in (('requires.txt', get_requirements_files()),
                             ('test-requires.txt', TEST_REQUIREMENTS_FILES)):
         target_path = os.path.join(egg_info_dir, target)
         for src in _any_existing(sources):
@@ -372,7 +400,10 @@ class _PipInstallTestRequires(object):
         links = _make_links_args(
             parse_dependency_links(TEST_REQUIREMENTS_FILES))
         if self.distribution.tests_require:
-            _pip_install(links, self.distribution.tests_require)
+            option_dict = self.distribution.get_option_dict('pbr')
+            _pip_install(
+                links, self.distribution.tests_require,
+                option_dict=option_dict)
 
     def pre_run(self):
         self.egg_name = pkg_resources.safe_name(self.distribution.get_name())
@@ -430,6 +461,133 @@ def have_nose():
     return _have_nose
 
 
+_script_text = """# PBR Generated from %(group)r
+
+import sys
+
+from %(module_name)s import %(import_target)s
+
+
+if __name__ == "__main__":
+    sys.exit(%(invoke_target)s())
+"""
+
+
+def override_get_script_args(
+        dist, executable=os.path.normpath(sys.executable), is_wininst=False):
+    """Override entrypoints console_script."""
+    header = easy_install.get_script_header("", executable, is_wininst)
+    for group in 'console_scripts', 'gui_scripts':
+        for name, ep in dist.get_entry_map(group).items():
+            if not ep.attrs or len(ep.attrs) > 2:
+                raise ValueError("Script targets must be of the form "
+                                 "'func' or 'Class.class_method'.")
+            script_text = _script_text % dict(
+                group=group,
+                module_name=ep.module_name,
+                import_target=ep.attrs[0],
+                invoke_target='.'.join(ep.attrs),
+            )
+            yield (name, header+script_text)
+
+
+class LocalInstallScripts(install_scripts.install_scripts):
+    """Intercepts console scripts entry_points."""
+    command_name = 'install_scripts'
+
+    def run(self):
+        if os.name != 'nt':
+            get_script_args = override_get_script_args
+        else:
+            get_script_args = easy_install.get_script_args
+
+        import distutils.command.install_scripts
+
+        self.run_command("egg_info")
+        if self.distribution.scripts:
+            # run first to set up self.outfiles
+            distutils.command.install_scripts.install_scripts.run(self)
+        else:
+            self.outfiles = []
+        if self.no_ep:
+            # don't install entry point scripts into .egg file!
+            return
+
+        ei_cmd = self.get_finalized_command("egg_info")
+        dist = pkg_resources.Distribution(
+            ei_cmd.egg_base,
+            pkg_resources.PathMetadata(ei_cmd.egg_base, ei_cmd.egg_info),
+            ei_cmd.egg_name, ei_cmd.egg_version,
+        )
+        bs_cmd = self.get_finalized_command('build_scripts')
+        executable = getattr(
+            bs_cmd, 'executable', easy_install.sys_executable)
+        is_wininst = getattr(
+            self.get_finalized_command("bdist_wininst"), '_is_running', False
+        )
+        for args in get_script_args(dist, executable, is_wininst):
+            self.write_script(*args)
+
+
+class LocalManifestMaker(egg_info.manifest_maker):
+    """Add any files that are in git and some standard sensible files."""
+
+    def _add_pbr_defaults(self):
+        for template_line in [
+            'include AUTHORS',
+            'include ChangeLog',
+            'exclude .gitignore',
+            'exclude .gitreview',
+            'global-exclude *.pyc'
+        ]:
+            self.filelist.process_template_line(template_line)
+
+    def add_defaults(self):
+        option_dict = self.distribution.get_option_dict('pbr')
+
+        sdist.sdist.add_defaults(self)
+        self.filelist.append(self.template)
+        self.filelist.append(self.manifest)
+        self.filelist.extend(extra_files.get_extra_files())
+        should_skip = get_boolean_option(option_dict, 'skip_git_sdist',
+                                         'SKIP_GIT_SDIST')
+        if not should_skip:
+            rcfiles = _find_git_files()
+            if rcfiles:
+                self.filelist.extend(rcfiles)
+        elif os.path.exists(self.manifest):
+            self.read_manifest()
+        ei_cmd = self.get_finalized_command('egg_info')
+        self._add_pbr_defaults()
+        self.filelist.include_pattern("*", prefix=ei_cmd.egg_info)
+
+
+class LocalEggInfo(egg_info.egg_info):
+    """Override the egg_info command to regenerate SOURCES.txt sensibly."""
+
+    command_name = 'egg_info'
+
+    def find_sources(self):
+        """Generate SOURCES.txt only if there isn't one already.
+
+        If we are in an sdist command, then we always want to update
+        SOURCES.txt. If we are not in an sdist command, then it doesn't
+        matter one flip, and is actually destructive.
+        """
+        manifest_filename = os.path.join(self.egg_info, "SOURCES.txt")
+        if not os.path.exists(manifest_filename) or 'sdist' in sys.argv:
+            log.info("[pbr] Processing SOURCES.txt")
+            mm = LocalManifestMaker(self.distribution)
+            mm.manifest = manifest_filename
+            mm.run()
+            self.filelist = mm.filelist
+        else:
+            log.info("[pbr] Reusing existing SOURCES.txt")
+            self.filelist = egg_info.FileList()
+            for entry in open(manifest_filename, 'r').read().split('\n'):
+                self.filelist.append(entry)
+
+
 class LocalSDist(sdist.sdist):
     """Builds the ChangeLog and Authors files from VC first."""
 
@@ -443,6 +601,7 @@ class LocalSDist(sdist.sdist):
         sdist.sdist.run(self)
 
 try:
+    from sphinx import apidoc
     from sphinx import application
     from sphinx import config
     from sphinx import setup_command
@@ -452,17 +611,21 @@ try:
         command_name = 'build_sphinx'
         builders = ['html', 'man']
 
-        def generate_autoindex(self):
+        def _get_source_dir(self):
             option_dict = self.distribution.get_option_dict('build_sphinx')
-            log.info("[pbr] Autodocumenting from %s"
-                     % os.path.abspath(os.curdir))
-            modules = {}
             if 'source_dir' in option_dict:
                 source_dir = os.path.join(option_dict['source_dir'][1], 'api')
             else:
                 source_dir = 'doc/source/api'
             if not os.path.exists(source_dir):
                 os.makedirs(source_dir)
+            return source_dir
+
+        def generate_autoindex(self):
+            log.info("[pbr] Autodocumenting from %s"
+                     % os.path.abspath(os.curdir))
+            modules = {}
+            source_dir = self._get_source_dir()
             for pkg in self.distribution.packages:
                 if '.' not in pkg:
                     for dirpath, dirnames, files in os.walk(pkg):
@@ -488,6 +651,10 @@ try:
                     with open(output_filename, 'w') as output_file:
                         output_file.write(_rst_template % values)
                     autoindex.write("   %s.rst\n" % module)
+
+        def _sphinx_tree(self):
+                source_dir = self._get_source_dir()
+                apidoc.main(['apidoc', '.', '-H', 'Modules', '-o', source_dir])
 
         def _sphinx_run(self):
             if not self.verbose:
@@ -529,11 +696,19 @@ try:
 
         def run(self):
             option_dict = self.distribution.get_option_dict('pbr')
-            if ('autodoc_index_modules' in option_dict and
-                    option_dict.get(
-                        'autodoc_index_modules')[1].lower() in TRUE_VALUES and
-                    not os.getenv('SPHINX_DEBUG')):
-                self.generate_autoindex()
+            tree_index = get_boolean_option(option_dict,
+                                            'autodoc_tree_index_modules',
+                                            'AUTODOC_TREE_INDEX_MODULES')
+            auto_index = get_boolean_option(option_dict,
+                                            'autodoc_index_modules',
+                                            'AUTODOC_INDEX_MODULES')
+            if not os.getenv('SPHINX_DEBUG'):
+                #NOTE(afazekas): These options can be used together,
+                # but they do a very similar thing in a difffernet way
+                if tree_index:
+                    self._sphinx_tree()
+                if auto_index:
+                    self.generate_autoindex()
 
             for builder in self.builders:
                 self.builder = builder

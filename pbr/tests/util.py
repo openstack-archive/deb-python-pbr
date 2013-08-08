@@ -38,21 +38,37 @@
 # INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
 # BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
 
-from testtools import content
+import contextlib
+import os
+import shutil
+import stat
 
-from pbr.d2to1 import tests
+try:
+    import ConfigParser as configparser
+except ImportError:
+    import configparser
 
 
-class TestCommands(tests.D2to1TestCase):
-    def test_custom_build_py_command(self):
-        """Test custom build_py command.
+@contextlib.contextmanager
+def open_config(filename):
+    cfg = configparser.ConfigParser()
+    cfg.read(filename)
+    yield cfg
+    with open(filename, 'w') as fp:
+        cfg.write(fp)
 
-        Test that a custom subclass of the build_py command runs when listed in
-        the commands [global] option, rather than the normal build command.
-        """
 
-        stdout, stderr, return_code = self.run_setup('build_py')
-        self.addDetail('stdout', content.text_content(stdout))
-        self.addDetail('stderr', content.text_content(stderr))
-        self.assertIn('Running custom build_py command.', stdout)
-        self.assertEqual(return_code, 0)
+def rmtree(path):
+    """shutil.rmtree() with error handler.
+
+    Handle 'access denied' from trying to delete read-only files.
+    """
+
+    def onerror(func, path, exc_info):
+        if not os.access(path, os.W_OK):
+            os.chmod(path, stat.S_IWUSR)
+            func(path)
+        else:
+            raise
+
+    return shutil.rmtree(path, onerror=onerror)
