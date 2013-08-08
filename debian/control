@@ -6,7 +6,8 @@ Uploaders: Loic Dachary (OuoU) <loic@debian.org>,
            Julien Danjou <acid@debian.org>,
            Thomas Goirand <zigo@debian.org>,
            Ghe Rivero <ghe.rivero@stackops.com>,
-           Mehdi Abaakouk <sileht@sileht.net>
+           Mehdi Abaakouk <sileht@sileht.net>,
+           Prach Pongpanich <prachpub@gmail.com>
 Build-Depends: debhelper (>= 9),
                openstack-pkg-tools,
                python-all (>= 2.6.6-3~),
