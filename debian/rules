@@ -2,7 +2,6 @@
 
 PYTHONS:=$(shell pyversions -vr)
 PYTHON3S:=$(shell py3versions -vr)
-py3sdo=set -ex; $(foreach py, $(PYTHON3S), $(py) $(1);)
 
 UPSTREAM_GIT = git://github.com/openstack-dev/pbr.git
 include /usr/share/openstack-pkg-tools/pkgos.make
@@ -14,17 +13,16 @@ export OSLO_PACKAGE_VERSION=$(VERSION)
 
 override_dh_clean:
 	dh_clean
-	# This is for a cowbuilder, as it's downloading this on clean
-	# there...
-	rm -rf d2to1-*-py*egg
-
-override_dh_auto_build:
-	dh_auto_build
-	$(call py3sdo, setup.py build)
 
 override_dh_auto_install:
-	dh_auto_install
-	$(call py3sdo, setup.py install --root=$(CURDIR)/debian/tmp --install-layout=deb)
+	set -e && for pyvers in $(PYTHONS); do \
+		python$$pyvers setup.py install --install-layout=deb \
+			--root $(CURDIR)/debian/python-pbr; \
+	done
+	set -e && for pyvers in $(PYTHON3S); do \
+		python$$pyvers setup.py install --install-layout=deb \
+			--root $(CURDIR)/debian/python3-pbr; \
+	done
 
 override_dh_auto_clean:
 	dh_auto_clean
