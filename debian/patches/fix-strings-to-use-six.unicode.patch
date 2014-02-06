@@ -1,0 +1,97 @@
+Description: <short summary of the patch>
+ TODO: Put a short summary on the line above and replace this paragraph
+ with a longer explanation of this change. Complete the meta-information
+ with other relevant fields (see below for details). To make it easier, the
+ information below has been extracted from the changelog. Adjust it or drop
+ it.
+ .
+ python-pbr (0.6-1) unstable; urgency=medium
+ .
+   * New upstream release.
+   * Standards-Version: is now 3.9.5.
+   * Patch upstream code to removes unicode strings which are incompatible with
+     Python 3.2.
+   * Reviewed build-depends for new upstream release.
+   * Runs unit tests on build.
+Author: Thomas Goirand <zigo@debian.org>
+
+---
+The information above should follow the Patch Tagging Guidelines, please
+checkout http://dep.debian.net/deps/dep3/ to learn about the format. Here
+are templates for supplementary fields that you might want to add:
+
+Origin: <vendor|upstream|other>, <url of original patch>
+Bug: <url in upstream bugtracker>
+Bug-Debian: http://bugs.debian.org/<bugnumber>
+Bug-Ubuntu: https://launchpad.net/bugs/<bugnumber>
+Forwarded: <no|not-needed|url proving that it has been forwarded>
+Reviewed-By: <name and email of someone who approved the patch>
+Last-Update: <YYYY-MM-DD>
+
+--- python-pbr-0.6.orig/pbr/packaging.py
++++ python-pbr-0.6/pbr/packaging.py
+@@ -36,6 +36,7 @@ from setuptools.command import egg_info
+ from setuptools.command import install
+ from setuptools.command import install_scripts
+ from setuptools.command import sdist
++import six
+ 
+ try:
+     import cStringIO
+@@ -270,7 +271,7 @@ def write_git_changelog(git_dir=None, de
+             first_line = True
+             with io.open(new_changelog, "w",
+                          encoding="utf-8") as changelog_file:
+-                changelog_file.write(u"CHANGES\n=======\n\n")
++                changelog_file.write(six.unicode("CHANGES\n=======\n\n"))
+                 for line in changelog.split('\n'):
+                     line_parts = line.split()
+                     if len(line_parts) < 2:
+@@ -291,17 +292,17 @@ def write_git_changelog(git_dir=None, de
+ 
+                         underline = len(tag) * '-'
+                         if not first_line:
+-                            changelog_file.write(u'\n')
++                            changelog_file.write(six.unicode('\n'))
+                         changelog_file.write(
+-                            (u"%(tag)s\n%(underline)s\n\n" %
++                            (six.unicode("%(tag)s\n%(underline)s\n\n" %
+                              dict(tag=tag,
+-                                  underline=underline)))
++                                  underline=underline))))
+ 
+                     if not msg.startswith("Merge "):
+                         if msg.endswith("."):
+                             msg = msg[:-1]
+                         changelog_file.write(
+-                            (u"* %(msg)s\n" % dict(msg=msg)))
++                            (six.unicode("* %(msg)s\n" % dict(msg=msg))))
+                     first_line = False
+ 
+ 
+--- python-pbr-0.6.orig/pbr/tests/test_setup.py
++++ python-pbr-0.6/pbr/tests/test_setup.py
+@@ -34,7 +34,7 @@ import testscenarios
+ 
+ from pbr import packaging
+ from pbr.tests import base
+-
++import six
+ 
+ class SkipFileWrites(base.BaseTestCase):
+ 
+@@ -145,10 +145,10 @@ class GitLogsTest(base.BaseTestCase):
+             self.assertNotIn('Merge "', changelog_contents)
+ 
+     def test_generate_authors(self):
+-        author_old = u"Foo Foo <email@foo.com>"
+-        author_new = u"Bar Bar <email@bar.com>"
+-        co_author = u"Foo Bar <foo@bar.com>"
+-        co_author_by = u"Co-authored-by: " + co_author
++        author_old = six.unicode("Foo Foo <email@foo.com>")
++        author_new = six.unicode("Bar Bar <email@bar.com>")
++        co_author = six.unicode("Foo Bar <foo@bar.com>")
++        co_author_by = six.unicode("Co-authored-by: ") + co_author
+ 
+         git_log_cmd = (
+             "git --git-dir=%s log --use-mailmap --format=%%aN <%%aE>"

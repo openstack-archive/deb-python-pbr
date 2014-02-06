@@ -1,1 +1,1 @@
-removes-unicode-strings-incompatible-with-python3.2.patch
+fix-strings-to-use-six.unicode.patch
