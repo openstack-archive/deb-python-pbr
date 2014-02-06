@@ -29,3 +29,8 @@ override_dh_auto_clean:
 	dh_auto_clean
 	rm -rf build
 	rm -rf *.egg-info __pycache__
+
+override_dh_auto_test:
+ifeq (,$(findstring nocheck, $(DEB_BUILD_OPTIONS)))
+	python setup.py testr --slowest --testr-args='--subunit  ' || true
+endif
