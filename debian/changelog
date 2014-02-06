@@ -4,6 +4,7 @@ python-pbr (0.6-1) unstable; urgency=medium
   * Standards-Version: is now 3.9.5.
   * Patch upstream code to removes unicode strings which are incompatible with
     Python 3.2.
+  * Reviewed build-depends for new upstream release.
 
  -- Thomas Goirand <zigo@debian.org>  Thu, 06 Feb 2014 10:46:41 +0800
 
