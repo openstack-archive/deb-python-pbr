@@ -43,7 +43,7 @@ Last-Update: <YYYY-MM-DD>
              with io.open(new_changelog, "w",
                           encoding="utf-8") as changelog_file:
 -                changelog_file.write(u"CHANGES\n=======\n\n")
-+                changelog_file.write(six.unicode("CHANGES\n=======\n\n"))
++                changelog_file.write(unicode("CHANGES\n=======\n\n"))
                  for line in changelog.split('\n'):
                      line_parts = line.split()
                      if len(line_parts) < 2:
@@ -52,10 +52,10 @@ Last-Update: <YYYY-MM-DD>
                          underline = len(tag) * '-'
                          if not first_line:
 -                            changelog_file.write(u'\n')
-+                            changelog_file.write(six.unicode('\n'))
++                            changelog_file.write(unicode('\n'))
                          changelog_file.write(
 -                            (u"%(tag)s\n%(underline)s\n\n" %
-+                            (six.unicode("%(tag)s\n%(underline)s\n\n" %
++                            (unicode("%(tag)s\n%(underline)s\n\n" %
                               dict(tag=tag,
 -                                  underline=underline)))
 +                                  underline=underline))))
@@ -65,7 +65,7 @@ Last-Update: <YYYY-MM-DD>
                              msg = msg[:-1]
                          changelog_file.write(
 -                            (u"* %(msg)s\n" % dict(msg=msg)))
-+                            (six.unicode("* %(msg)s\n" % dict(msg=msg))))
++                            (unicode("* %(msg)s\n" % dict(msg=msg))))
                      first_line = False
  
  
@@ -88,10 +88,10 @@ Last-Update: <YYYY-MM-DD>
 -        author_new = u"Bar Bar <email@bar.com>"
 -        co_author = u"Foo Bar <foo@bar.com>"
 -        co_author_by = u"Co-authored-by: " + co_author
-+        author_old = six.unicode("Foo Foo <email@foo.com>")
-+        author_new = six.unicode("Bar Bar <email@bar.com>")
-+        co_author = six.unicode("Foo Bar <foo@bar.com>")
-+        co_author_by = six.unicode("Co-authored-by: ") + co_author
++        author_old = unicode("Foo Foo <email@foo.com>")
++        author_new = unicode("Bar Bar <email@bar.com>")
++        co_author = unicode("Foo Bar <foo@bar.com>")
++        co_author_by = unicode("Co-authored-by: ") + co_author
  
          git_log_cmd = (
              "git --git-dir=%s log --use-mailmap --format=%%aN <%%aE>"
