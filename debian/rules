@@ -1,7 +1,8 @@
 #!/usr/bin/make -f
 
-PYTHON3:=$(shell py3versions -r)
-py3sdo=set -ex; $(foreach py, $(PYTHON3), $(py) $(1);)
+PYTHONS:=$(shell pyversions -vr)
+PYTHON3S:=$(shell py3versions -vr)
+py3sdo=set -ex; $(foreach py, $(PYTHON3S), $(py) $(1);)
 
 UPSTREAM_GIT = git://github.com/openstack-dev/pbr.git
 include /usr/share/openstack-pkg-tools/pkgos.make
@@ -32,5 +33,7 @@ override_dh_auto_clean:
 
 override_dh_auto_test:
 ifeq (,$(findstring nocheck, $(DEB_BUILD_OPTIONS)))
-	python setup.py testr --slowest --testr-args='--subunit  ' || true
+	set -e && for vers in $(PYTHONS) $(PYTHON3S) ; do \
+		python$$vers setup.py testr --slowest --testr-args='--subunit  ' || true ; \
+	done
 endif
