@@ -1,6 +1,6 @@
-===================================
- pbr - Python Build Reasonableness
-===================================
+=================================
+pbr - Python Build Reasonableness
+=================================
 
 A library for managing setuptools packaging needs in a consistent manner.
 
@@ -31,6 +31,8 @@ that's the version. If it's not, and you don't provide a version, the version
 will be very similar to git describe. If you do, then we'll assume that's the
 version you are working towards, and will generate alpha version strings
 based on commits since last tag and the current git sha.
+
+The versions are expected to be compliant with :doc:`semver`.
 
 AUTHORS and ChangeLog
 ---------------------
@@ -64,6 +66,21 @@ keep requirements.txt format files around describing the requirements for
 your project, will parse them and split them up approprirately, and inject
 them into the install_requires and/or tests_require and/or dependency_links
 arguments to setup. Voila!
+
+You can also have a requirement file for each specific major version of
+Python. If you want to have a different package list for Python 3, just drop
+a requirements-py3.txt, and it will be used instead.
+
+The requirement files are tried in that order (N being the Python major
+version number used to install the package):
+
+* requirements-pyN.txt
+* tools/pip-requires-py3
+* requirements.txt
+* tools/pip-requires
+
+Only the first file found is used to install the list of packages it
+contains.
 
 long_description
 ----------------
@@ -141,7 +158,7 @@ fundamental keys one is likely to care about, `packages`,
 
 `packages` is a list of top-level packages that should be installed. The
 behavior of packages is similar to `setuptools.find_packages` in that it
-recurses the python package heirarchy below the given top level and installs
+recurses the python package hierarchy below the given top level and installs
 all of it. If `packages` is not specified, it defaults to the name given
 in the `[metadata]` section.
 
@@ -190,6 +207,15 @@ Will cause a console script called `pbr` to be installed that executes the
 installed for `pbr.config.drivers`, one called `plain` which maps to the
 `Plain` class in `pbr.cfg.driver` and one called `fancy` which maps to the
 `Fancy` class in `pbr.cfg.driver`.
+
+Additional Docs
+===============
+
+.. toctree::
+   :maxdepth: 1
+
+   packagers
+   semver
 
 Indices and tables
 ==================

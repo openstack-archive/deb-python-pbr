@@ -40,13 +40,20 @@
 
 import os
 
-from pbr import tests
+import fixtures
+import mock
+
+from pbr import packaging
+from pbr.tests import base
 
 
-class TestPackagingInGitRepoWithCommit(tests.BaseTestCase):
+class TestPackagingInGitRepoWithCommit(base.BaseTestCase):
 
     def setUp(self):
         super(TestPackagingInGitRepoWithCommit, self).setUp()
+        self.useFixture(fixtures.TempHomeDir())
+        self._run_cmd(
+            'git', ['config', '--global', 'user.email', 'nobody@example.com'])
         self._run_cmd('git', ['init', '.'])
         self._run_cmd('git', ['add', '.'])
         self._run_cmd('git', ['commit', '-m', 'test commit'])
@@ -66,7 +73,7 @@ class TestPackagingInGitRepoWithCommit(tests.BaseTestCase):
         self.assertNotEqual(body, '')
 
 
-class TestPackagingInGitRepoWithoutCommit(tests.BaseTestCase):
+class TestPackagingInGitRepoWithoutCommit(base.BaseTestCase):
 
     def setUp(self):
         super(TestPackagingInGitRepoWithoutCommit, self).setUp()
@@ -85,10 +92,10 @@ class TestPackagingInGitRepoWithoutCommit(tests.BaseTestCase):
         # No commits, nothing should be in the ChangeLog list
         with open(os.path.join(self.package_dir, 'ChangeLog'), 'r') as f:
             body = f.read()
-        self.assertEqual(body, '')
+        self.assertEqual(body, 'CHANGES\n=======\n\n')
 
 
-class TestPackagingInPlainDirectory(tests.BaseTestCase):
+class TestPackagingInPlainDirectory(base.BaseTestCase):
 
     def setUp(self):
         super(TestPackagingInPlainDirectory, self).setUp()
@@ -104,3 +111,18 @@ class TestPackagingInPlainDirectory(tests.BaseTestCase):
         # Not a git repo, no ChangeLog created
         filename = os.path.join(self.package_dir, 'ChangeLog')
         self.assertFalse(os.path.exists(filename))
+
+
+class TestPresenceOfGit(base.BaseTestCase):
+
+    def testGitIsInstalled(self):
+        with mock.patch.object(packaging,
+                               '_run_shell_command') as _command:
+            _command.return_value = 'git version 1.8.4.1'
+            self.assertEqual(True, packaging._git_is_installed())
+
+    def testGitIsNotInstalled(self):
+        with mock.patch.object(packaging,
+                               '_run_shell_command') as _command:
+            _command.side_effect = OSError
+            self.assertEqual(False, packaging._git_is_installed())

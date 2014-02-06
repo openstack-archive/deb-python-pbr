@@ -2,19 +2,38 @@
 
 function mkvenv {
     venv=$1
-    setuptools=$2
-    pip=$3
 
     rm -rf $venv
-    if [ "$setuptools" == 'distribute' ] ; then
-        virtualenv --distribute $venv
-    elif [ "$setuptools" == 'setuptools' ] ; then
-        virtualenv $venv
-    else
-        virtualenv $venv
-        $venv/bin/pip install -v -U $setuptools
-    fi
-    $venv/bin/pip install $pip
+    virtualenv $venv
+    $venv/bin/pip install -U pip wheel
+}
+
+# This function takes a list of files that contains
+# a list of python packages (in pip freeze format) and
+# strips the version info from each entry.
+# $1 - The files containing python packages (with version).
+function gen_bare_package_list () {
+    set +x
+    IN_FILES=$1
+    for FILE in $IN_FILES
+    do
+        while read line; do
+              if [[ "$line" == "" ]] || [[ "$line" == \#* ]] || [[ "$line" == \-f* ]]; then
+                  continue
+              elif [[ "$line" == \-e* ]]; then
+                  echo "${line#*=}"
+              elif [[ "$line" == *\>* ]]; then
+                  echo "${line%%>*}"
+              elif [[ "$line" == *\=* ]]; then
+                  echo "${line%%=*}"
+              elif [[ "$line" == *\<* ]]; then
+                  echo "${line%%<*}"
+              else
+                  echo "${line%%#*}"
+              fi
+        done < $FILE
+    done
+    set -x
 }
 
 # BASE should be a directory with a subdir called "new" and in that
@@ -24,7 +43,7 @@ BASE=${BASE:-/opt/stack}
 REPODIR=${REPODIR:-$BASE/new}
 
 # TODO: Figure out how to get this on to the box properly
-sudo apt-get install -y --force-yes libxml2-dev libxslt-dev libmysqlclient-dev libpq-dev libnspr4-dev pkg-config libsqlite3-dev libzmq-dev libffi-dev
+sudo apt-get install -y --force-yes libxml2-dev libxslt-dev libmysqlclient-dev libpq-dev libnspr4-dev pkg-config libsqlite3-dev libzmq-dev libffi-dev libldap2-dev libsasl2-dev
 
 tmpdir=$(mktemp -d)
 
@@ -32,10 +51,11 @@ whoami=$(whoami)
 tmpdownload=$tmpdir/download
 mkdir -p $tmpdownload
 
-pypidir=$tmpdir/pypi
-mkdir -p $pypidir
+pypidir=/var/www/pypi
+sudo mkdir -p $pypidir
+sudo chown $USER $pypidir
 
-jeepybvenv=$tmpdir/jeepyb
+pypimirrorvenv=$tmpdir/pypi-mirror
 
 sudo touch $HOME/pip.log
 sudo chown $USER $HOME/pip.log
@@ -47,11 +67,11 @@ cat <<EOF > ~/.pip/pip.conf
 log = $HOME/pip.log
 EOF
 
-jeepybsourcedir=$tmpdir/jeepybsourcedir
-git clone $REPODIR/jeepyb $jeepybsourcedir
+pypimirrorsourcedir=$tmpdir/pypimirrorsourcedir
+git clone $REPODIR/pypi-mirror $pypimirrorsourcedir
 
-mkvenv $jeepybvenv setuptools pip
-$jeepybvenv/bin/pip install -e $jeepybsourcedir
+mkvenv $pypimirrorvenv
+$pypimirrorvenv/bin/pip install -e $pypimirrorsourcedir
 
 cat <<EOF > $tmpdir/mirror.yaml
 cache-root: $tmpdownload
@@ -63,20 +83,28 @@ mirrors:
     output: $pypidir
 EOF
 
-# Default to using pypi.openstack.org as an easy_install mirror
-if [ "$1" == "--no-mirror" ] ; then
-    shift
-else
-    cat <<EOF > ~/.pydistutils.cfg
-[easy_install]
-index_url = http://pypi.openstack.org/openstack
-EOF
-    cat <<EOF > ~/.pip/pip.conf
-[global]
-index-url = http://pypi.openstack.org/openstack
-log = $HOME/pip.log
-EOF
+# wheel mirrors are below a dir level containing distro and release
+# because the wheel format itself does not distinguish
+distro=`lsb_release -i -r -s | xargs | tr ' ' '-'`
+
+# set up local apache to serve the mirror we're about to create
+if [ ! -d /etc/apache2/sites-enabled/ ] ; then
+    echo "Apache does not seem to be installed!!!"
+    exit 1
 fi
+
+sudo rm /etc/apache2/sites-enabled/*
+cat <<EOF > $tmpdir/pypi.conf
+<VirtualHost *:80>
+    ServerAdmin webmaster@localhost
+    DocumentRoot /var/www
+    Options Indexes FollowSymLinks
+</VirtualHost>
+EOF
+sudo mv $tmpdir/pypi.conf /etc/apache2/sites-available/pypi
+sudo chown root:root /etc/apache2/sites-available/pypi
+sudo a2ensite pypi
+sudo service apache2 reload
 
 # PROJECTS is a list of projects that we're testing
 PROJECTS=$*
@@ -85,19 +113,32 @@ pbrsdistdir=$tmpdir/pbrsdist
 git clone $REPODIR/pbr $pbrsdistdir
 cd $pbrsdistdir
 
-$jeepybvenv/bin/run-mirror -b remotes/origin/master --verbose -c $tmpdir/mirror.yaml --no-process
+# Note the -b argument here is essentially a noop as
+# --no-update is passed as well. The one thing the -b
+# does give us is it makes run-mirror install dependencies
+# once instead of over and over for all branches it can find.
+$pypimirrorvenv/bin/run-mirror -b remotes/origin/master --no-update --verbose -c $tmpdir/mirror.yaml --no-process --export=$HOME/mirror_package_list.txt
+# Compare packages in the mirror with the list of requirements
+gen_bare_package_list "$REPODIR/requirements/global-requirements.txt $REPODIR/requirements/dev-requirements.txt" > bare_all_requirements.txt
+gen_bare_package_list $HOME/mirror_package_list.txt > bare_mirror_package_list.txt
+echo "Diff between python mirror packages and requirements packages:"
+grep -v -f bare_all_requirements.txt bare_mirror_package_list.txt > diff_requirements_mirror.txt
+cat diff_requirements_mirror.txt
 
-$jeepybvenv/bin/pip install -i http://pypi.python.org/simple -d $tmpdownload/pip/openstack 'pip==1.0' 'setuptools>=0.7'
+$pypimirrorvenv/bin/pip install -i http://pypi.python.org/simple -d $tmpdownload/pip/openstack 'pip==1.0' 'setuptools>=0.7' 'd2to1'
 
-$jeepybvenv/bin/pip install -i http://pypi.python.org/simple -d $tmpdownload/pip/openstack -r requirements.txt
-$jeepybvenv/bin/python setup.py sdist -d $tmpdownload/pip/openstack
+$pypimirrorvenv/bin/pip install -i http://pypi.python.org/simple -d $tmpdownload/pip/openstack -r requirements.txt
+$pypimirrorvenv/bin/python setup.py sdist -d $tmpdownload/pip/openstack
 
-$jeepybvenv/bin/run-mirror -b remotes/origin/master --verbose -c $tmpdir/mirror.yaml --no-download
+$pypimirrorvenv/bin/run-mirror -b remotes/origin/master --no-update --verbose -c $tmpdir/mirror.yaml --no-download
 
+find $pypidir -type f -name '*.html' -delete
 find $pypidir
 
+
 # Make pypi thing
-pypiurl=file://$pypidir
+pypiurl=http://localhost/pypi
+export no_proxy=$no_proxy${no_proxy:+,}localhost
 
 cat <<EOF > ~/.pydistutils.cfg
 [easy_install]
@@ -107,6 +148,7 @@ EOF
 cat <<EOF > ~/.pip/pip.conf
 [global]
 index-url = $pypiurl
+extra-index-url = $pypiurl/$distro
 extra-index-url = http://pypi.openstack.org/openstack
 log = $HOME/pip.log
 EOF
@@ -143,7 +185,7 @@ def main():
 EOF
 
 epvenv=$eptest/venv
-mkvenv $epvenv setuptools pip
+mkvenv $epvenv
 
 eppbrdir=$tmpdir/eppbrdir
 git clone $REPODIR/pbr $eppbrdir
@@ -159,9 +201,17 @@ mkdir -p $projectdir
 
 for PROJECT in $PROJECTS ; do
     SHORT_PROJECT=$(basename $PROJECT)
-    if ! grep 'pbr' $REPODIR/$SHORT_PROJECT/requirements.txt >/dev/null 2>&1
+    if ! grep 'pbr' $REPODIR/$SHORT_PROJECT/setup.py >/dev/null 2>&1
     then
         # project doesn't use pbr
+        continue
+    fi
+    if [ $SHORT_PROJECT = 'pypi-mirror' ]; then
+        # pypi-mirror doesn't consume the mirror
+        continue
+    fi
+    if [ $SHORT_PROJECT = 'jeepyb' ]; then
+        # pypi-mirror doesn't consume the mirror
         continue
     fi
     if [ $SHORT_PROJECT = 'tempest' ]; then
@@ -172,34 +222,44 @@ for PROJECT in $PROJECTS ; do
         # requirements doesn't really install
         continue
     fi
+
+    # set up the project synced with the global requirements
+    sudo chown -R $USER $REPODIR/$SHORT_PROJECT
+    (cd $REPODIR/requirements && python update.py $REPODIR/$SHORT_PROJECT)
+    pushd $REPODIR/$SHORT_PROJECT
+    if ! git diff --quiet ; then
+        git commit -a -m'Update requirements'
+    fi
+    popd
+
+    # Clone from synced repo
     shortprojectdir=$projectdir/$SHORT_PROJECT
     git clone $REPODIR/$SHORT_PROJECT $shortprojectdir
 
-    sdistvenv=$tmpdir/sdist
-
     # Test that we can make a tarball from scratch
-    mkvenv $sdistvenv distribute pip
+    sdistvenv=$tmpdir/sdist
+    mkvenv $sdistvenv
     cd $shortprojectdir
     $sdistvenv/bin/python setup.py sdist
 
-    # Test that the tarball installs
     cd $tmpdir
+
+    # Test that the tarball installs
     tarballvenv=$tmpdir/tarball
-    mkvenv $tarballvenv setuptools pip
+    mkvenv $tarballvenv
     $tarballvenv/bin/pip install $shortprojectdir/dist/*tar.gz
 
     # Test pip installing
     pipvenv=$tmpdir/pip
-    mkvenv $pipvenv setuptools 'pip==1.0'
-    cd $tmpdir
-    echo $pipvenv/bin/pip install git+file://$REPODIR/$SHORT_PROJECT
-    $pipvenv/bin/pip install git+file://$REPODIR/$SHORT_PROJECT
+    mkvenv $pipvenv
+    $pipvenv/bin/pip install git+file://$shortprojectdir
 
     # Test python setup.py install
     installvenv=$tmpdir/install
-    mkvenv $installvenv setuptools pip
+    mkvenv $installvenv
+
     installprojectdir=$projectdir/install$SHORT_PROJECT
-    git clone $REPODIR/$SHORT_PROJECT $installprojectdir
+    git clone $shortprojectdir $installprojectdir
     cd $installprojectdir
     $installvenv/bin/python setup.py install
 
@@ -207,20 +267,4 @@ for PROJECT in $PROJECTS ; do
     if [ $SHORT_PROJECT = 'nova' ]; then
         find $installvenv | grep migrate.cfg
     fi
-
-    # TODO(mordred): extend script to do a better job with the mirrir
-    # easy_install to a file:/// can't handle name case insensitivity
-    # Test python setup.py develop
-    # developvenv=$tmpdir/develop
-    # mkvenv $developvenv setuptools pip
-    # developprojectdir=$projectdir/develop$SHORT_PROJECT
-    # git clone $REPODIR/$SHORT_PROJECT $developprojectdir
-    # cd $developprojectdir
-    # $developvenv/bin/python setup.py develop
-
-    # TODO(mordred): need to implement egg filtering
-    # Because install will have caused eggs to be locally downloaded
-    # pbr can get excluded from being in the actual venv
-    # test that this did not happen
-    # $tempvenv/bin/python -c 'import pkg_resources as p; import sys; pbr=p.working_set.find(p.Requirement.parse("pbr")) is None; sys.exit(pbr or 0)'
 done

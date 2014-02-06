@@ -21,6 +21,7 @@ Utilities with minimum-depends for use in setup.py
 """
 
 import email
+import io
 import os
 import re
 import subprocess
@@ -37,9 +38,9 @@ from setuptools.command import install_scripts
 from setuptools.command import sdist
 
 try:
-    import cStringIO as io
+    import cStringIO
 except ImportError:
-    import io
+    import io as cStringIO
 
 from pbr import extra_files
 
@@ -49,14 +50,20 @@ REQUIREMENTS_FILES = ('requirements.txt', 'tools/pip-requires')
 TEST_REQUIREMENTS_FILES = ('test-requirements.txt', 'tools/test-requires')
 # part of the standard library starting with 2.7
 # adding it to the requirements list screws distro installs
-BROKEN_ON_27 = ('argparse', 'importlib')
+BROKEN_ON_27 = ('argparse', 'importlib', 'ordereddict')
 
 
 def get_requirements_files():
     files = os.environ.get("PBR_REQUIREMENTS_FILES")
     if files:
         return tuple(f.strip() for f in files.split(','))
-    return REQUIREMENTS_FILES
+    # Returns a list composed of:
+    # - REQUIREMENTS_FILES with -py2 or -py3 in the name
+    #   (e.g. requirements-py3.txt)
+    # - REQUIREMENTS_FILES
+    return (list(map(('-py' + str(sys.version_info[0])).join,
+                     map(os.path.splitext, REQUIREMENTS_FILES)))
+            + list(REQUIREMENTS_FILES))
 
 
 def append_text_list(config, key, text_list):
@@ -81,48 +88,19 @@ def _parse_mailmap(mailmap_info):
     return mapping
 
 
-def _wrap_in_quotes(values):
-    return ["'%s'" % value for value in values]
-
-
-def _make_links_args(links):
-    return ["-f '%s'" % link for link in links]
-
-
 def _pip_install(links, requires, root=None, option_dict=dict()):
     if get_boolean_option(
             option_dict, 'skip_pip_install', 'SKIP_PIP_INSTALL'):
         return
-    root_cmd = ""
+    cmd = [sys.executable, '-m', 'pip.__init__', 'install']
     if root:
-        root_cmd = "--root=%s" % root
+        cmd.append("--root=%s" % root)
+    for link in links:
+        cmd.append("-f")
+        cmd.append(link)
     _run_shell_command(
-        "%s -m pip.__init__ install %s %s %s" % (
-            sys.executable,
-            root_cmd,
-            " ".join(links),
-            " ".join(_wrap_in_quotes(requires))),
-        throw_on_error=True, buffer=False)
-
-
-def read_git_mailmap(root_dir=None, mailmap='.mailmap'):
-    if not root_dir:
-        root_dir = _run_shell_command('git rev-parse --show-toplevel')
-
-    mailmap = os.path.join(root_dir, mailmap)
-    if os.path.exists(mailmap):
-        return _parse_mailmap(open(mailmap, 'r').readlines())
-
-    return dict()
-
-
-def canonicalize_emails(changelog, mapping):
-    """Takes in a string and an email alias mapping and replaces all
-       instances of the aliases in the string with their real email.
-    """
-    for alias, email_address in mapping.items():
-        changelog = changelog.replace(alias, email_address)
-    return changelog
+        cmd + requires,
+        throw_on_error=True, buffer=False, env=dict(PIP_USE_WHEEL="true"))
 
 
 def _any_existing(file_list):
@@ -156,29 +134,37 @@ def parse_requirements(requirements_files=None):
         if (not line.strip()) or line.startswith('#'):
             continue
 
+        try:
+            project_name = pkg_resources.Requirement.parse(line).project_name
+        except ValueError:
+            project_name = None
+
         # For the requirements list, we need to inject only the portion
         # after egg= so that distutils knows the package it's looking for
         # such as:
         # -e git://github.com/openstack/nova/master#egg=nova
         # -e git://github.com/openstack/nova/master#egg=nova-1.2.3
         if re.match(r'\s*-e\s+', line):
-            requirements.append(re.sub(r'\s*-e\s+.*#egg=(.*)$',
-                                       egg_fragment,
-                                       line))
+            line = re.sub(r'\s*-e\s+.*#egg=(.*)$', egg_fragment, line)
         # such as:
         # http://github.com/openstack/nova/zipball/master#egg=nova
         # http://github.com/openstack/nova/zipball/master#egg=nova-1.2.3
         elif re.match(r'\s*https?:', line):
-            requirements.append(re.sub(r'\s*https?:.*#egg=(.*)$',
-                                       egg_fragment,
-                                       line))
+            line = re.sub(r'\s*https?:.*#egg=(.*)$', egg_fragment, line)
         # -f lines are for index locations, and don't get used here
         elif re.match(r'\s*-f\s+', line):
-            pass
-        elif line in BROKEN_ON_27 and sys.version_info >= (2, 7):
-            pass
-        else:
+            line = None
+            reason = 'Index Location'
+        elif (project_name and
+                project_name in BROKEN_ON_27 and sys.version_info >= (2, 7)):
+            line = None
+            reason = 'Python 2.6 only dependency'
+
+        if line is not None:
             requirements.append(line)
+        else:
+            log.info(
+                '[pbr] Excluding %s: %s' % (project_name, reason))
 
     return requirements
 
@@ -202,7 +188,14 @@ def parse_dependency_links(requirements_files=None):
     return dependency_links
 
 
-def _run_shell_command(cmd, throw_on_error=False, buffer=True):
+def _run_git_command(cmd, git_dir, **kwargs):
+    if not isinstance(cmd, (list, tuple)):
+        cmd = [cmd]
+    return _run_shell_command(
+        ['git', '--git-dir=%s' % git_dir] + cmd, **kwargs)
+
+
+def _run_shell_command(cmd, throw_on_error=False, buffer=True, env=None):
     if buffer:
         out_location = subprocess.PIPE
         err_location = subprocess.PIPE
@@ -210,14 +203,14 @@ def _run_shell_command(cmd, throw_on_error=False, buffer=True):
         out_location = None
         err_location = None
 
-    if os.name == 'nt':
-        output = subprocess.Popen(["cmd.exe", "/C", cmd],
-                                  stdout=out_location,
-                                  stderr=err_location)
-    else:
-        output = subprocess.Popen(["/bin/sh", "-c", cmd],
-                                  stdout=out_location,
-                                  stderr=err_location)
+    newenv = os.environ.copy()
+    if env:
+        newenv.update(env)
+
+    output = subprocess.Popen(cmd,
+                              stdout=out_location,
+                              stderr=err_location,
+                              env=newenv)
     out = output.communicate()
     if output.returncode and throw_on_error:
         raise distutils.errors.DistutilsError(
@@ -228,7 +221,27 @@ def _run_shell_command(cmd, throw_on_error=False, buffer=True):
 
 
 def _get_git_directory():
-    return _run_shell_command("git rev-parse --git-dir", None)
+    return _run_shell_command(['git', 'rev-parse', '--git-dir'])
+
+
+def _git_is_installed():
+    try:
+        # We cannot use 'which git' as it may not be available
+        # in some distributions, So just try 'git --version'
+        # to see if we run into trouble
+        _run_shell_command(['git', '--version'])
+    except OSError:
+        return False
+    return True
+
+
+def _get_highest_tag(tags):
+    """Find the highest tag from a list.
+
+    Pass in a list of tag strings and this will return the highest
+    (latest) as sorted by the pkg_resources version parser.
+    """
+    return max(tags, key=pkg_resources.parse_version)
 
 
 def get_boolean_option(option_dict, option_name, env_name):
@@ -252,12 +265,44 @@ def write_git_changelog(git_dir=None, dest_dir=os.path.curdir,
         if git_dir is None:
             git_dir = _get_git_directory()
         if git_dir:
-            git_log_cmd = 'git --git-dir=%s log' % git_dir
-            changelog = _run_shell_command(git_log_cmd)
-            mailmap = read_git_mailmap()
-            with open(new_changelog, "wb") as changelog_file:
-                changelog_file.write(canonicalize_emails(
-                    changelog, mailmap).encode('utf-8'))
+            log_cmd = ['log', '--oneline', '--decorate']
+            changelog = _run_git_command(log_cmd, git_dir)
+            first_line = True
+            with io.open(new_changelog, "w",
+                         encoding="utf-8") as changelog_file:
+                changelog_file.write(u"CHANGES\n=======\n\n")
+                for line in changelog.split('\n'):
+                    line_parts = line.split()
+                    if len(line_parts) < 2:
+                        continue
+                    # Tags are in a list contained in ()'s. If a commit
+                    # subject that is tagged happens to have ()'s in it
+                    # this will fail
+                    if line_parts[1].startswith('(') and ')' in line:
+                        msg = line.split(')')[1].strip()
+                    else:
+                        msg = " ".join(line_parts[1:])
+
+                    if "tag:" in line:
+                        tags = [
+                            tag.split(",")[0]
+                            for tag in line.split(")")[0].split("tag: ")[1:]]
+                        tag = _get_highest_tag(tags)
+
+                        underline = len(tag) * '-'
+                        if not first_line:
+                            changelog_file.write(u'\n')
+                        changelog_file.write(
+                            (u"%(tag)s\n%(underline)s\n\n" %
+                             dict(tag=tag,
+                                  underline=underline)))
+
+                    if not msg.startswith("Merge "):
+                        if msg.endswith("."):
+                            msg = msg[:-1]
+                        changelog_file.write(
+                            (u"* %(msg)s\n" % dict(msg=msg)))
+                    first_line = False
 
 
 def generate_authors(git_dir=None, dest_dir='.', option_dict=dict()):
@@ -272,32 +317,25 @@ def generate_authors(git_dir=None, dest_dir='.', option_dict=dict()):
                 and not os.access(new_authors, os.W_OK)):
             return
         log.info('[pbr] Generating AUTHORS')
-        ignore_emails = '(jenkins@review|infra@lists)'
+        ignore_emails = '(jenkins@review|infra@lists|jenkins@openstack)'
         if git_dir is None:
             git_dir = _get_git_directory()
         if git_dir:
             authors = []
 
             # don't include jenkins email address in AUTHORS file
-            git_log_cmd = ("git --git-dir=" + git_dir +
-                           " log --format='%aN <%aE>'"
-                           " | egrep -v '" + ignore_emails + "'")
-            authors += _run_shell_command(git_log_cmd).split('\n')
+            git_log_cmd = ['log', '--use-mailmap', '--format=%aN <%aE>']
+            authors += _run_git_command(git_log_cmd, git_dir).split('\n')
+            authors = [a for a in authors if not re.search(ignore_emails, a)]
 
             # get all co-authors from commit messages
-            co_authors_cmd = ("git log --git-dir=" + git_dir +
-                              " | grep -i Co-authored-by:")
-            co_authors = _run_shell_command(co_authors_cmd)
-
+            co_authors_out = _run_git_command('log', git_dir)
+            co_authors = re.findall('Co-authored-by:.+', co_authors_out,
+                                    re.MULTILINE)
             co_authors = [signed.split(":", 1)[1].strip()
-                          for signed in co_authors.split('\n') if signed]
+                          for signed in co_authors if signed]
 
             authors += co_authors
-
-            # canonicalize emails, remove duplicates and sort
-            mailmap = read_git_mailmap(git_dir)
-            authors = canonicalize_emails('\n'.join(authors), mailmap)
-            authors = authors.split('\n')
             authors = sorted(set(authors))
 
             with open(new_authors, 'wb') as new_authors_fh:
@@ -315,12 +353,11 @@ def _find_git_files(dirname='', git_dir=None):
     at absurd times. We only want to do this when we are building an sdist.
     """
     file_list = []
-    if git_dir is None:
+    if git_dir is None and _git_is_installed():
         git_dir = _get_git_directory()
     if git_dir:
         log.info("[pbr] In git context, generating filelist from git")
-        git_ls_cmd = "git --git-dir=%s ls-files -z" % git_dir
-        file_list = _run_shell_command(git_ls_cmd)
+        file_list = _run_git_command(['ls-files', '-z'], git_dir)
         file_list = file_list.split(b'\x00'.decode('utf-8'))
     return [f for f in file_list if f]
 
@@ -364,9 +401,9 @@ class LocalInstall(install.install):
         option_dict = self.distribution.get_option_dict('pbr')
         if (not self.single_version_externally_managed
                 and self.distribution.install_requires):
-            links = _make_links_args(self.distribution.dependency_links)
             _pip_install(
-                links, self.distribution.install_requires, self.root,
+                self.distribution.dependency_links,
+                self.distribution.install_requires, self.root,
                 option_dict=option_dict)
 
         return du_install.install.run(self)
@@ -397,8 +434,7 @@ class _PipInstallTestRequires(object):
 
     def install_test_requirements(self):
 
-        links = _make_links_args(
-            parse_dependency_links(TEST_REQUIREMENTS_FILES))
+        links = parse_dependency_links(TEST_REQUIREMENTS_FILES)
         if self.distribution.tests_require:
             option_dict = self.distribution.get_option_dict('pbr')
             _pip_install(
@@ -488,7 +524,7 @@ def override_get_script_args(
                 import_target=ep.attrs[0],
                 invoke_target='.'.join(ep.attrs),
             )
-            yield (name, header+script_text)
+            yield (name, header + script_text)
 
 
 class LocalInstallScripts(install_scripts.install_scripts):
@@ -658,7 +694,7 @@ try:
 
         def _sphinx_run(self):
             if not self.verbose:
-                status_stream = io.StringIO()
+                status_stream = cStringIO.StringIO()
             else:
                 status_stream = sys.stdout
             confoverrides = {}
@@ -721,6 +757,13 @@ try:
                 else:
                     setup_command.BuildDoc.run(self)
 
+        def finalize_options(self):
+            # Not a new style class, super keyword does not work.
+            setup_command.BuildDoc.finalize_options(self)
+            # Allow builders to be configurable - as a comma separated list.
+            if not isinstance(self.builders, list) and self.builders:
+                self.builders = self.builders.split(',')
+
     class LocalBuildLatex(LocalBuildDoc):
         builders = ['latex']
         command_name = 'build_sphinx_latex'
@@ -742,14 +785,13 @@ def _get_revno(git_dir):
     tags then we fall back to counting commits since the beginning
     of time.
     """
-    describe = _run_shell_command(
-        "git --git-dir=%s describe --always" % git_dir)
+    describe = _run_git_command(['describe', '--always'], git_dir)
     if "-" in describe:
         return describe.rsplit("-", 2)[-2]
 
     # no tags found
-    revlist = _run_shell_command(
-        "git --git-dir=%s rev-list --abbrev-commit HEAD" % git_dir)
+    revlist = _run_git_command(
+        ['rev-list', '--abbrev-commit', 'HEAD'], git_dir)
     return len(revlist.splitlines())
 
 
@@ -763,18 +805,23 @@ def _get_version_from_git(pre_version):
     if git_dir:
         if pre_version:
             try:
-                return _run_shell_command(
-                    "git --git-dir=" + git_dir + " describe --exact-match",
+                return _run_git_command(
+                    ['describe', '--exact-match'], git_dir,
                     throw_on_error=True).replace('-', '.')
             except Exception:
-                sha = _run_shell_command(
-                    "git --git-dir=" + git_dir + " log -n1 --pretty=format:%h")
-                return "%s.a%s.g%s" % (pre_version, _get_revno(git_dir), sha)
+                sha = _run_git_command(
+                    ['log', '-n1', '--pretty=format:%h'], git_dir)
+                return "%s.dev%s.g%s" % (pre_version, _get_revno(git_dir), sha)
         else:
-            return _run_shell_command(
-                "git --git-dir=" + git_dir + " describe --always").replace(
-                    '-', '.')
-    return None
+            return _run_git_command(
+                ['describe', '--always'], git_dir).replace('-', '.')
+    # If we don't know the version, return an empty string so at least
+    # the downstream users of the value always have the same type of
+    # object to work with.
+    try:
+        return unicode()
+    except NameError:
+        return ''
 
 
 def _get_version_from_pkg_info(package_name):
@@ -814,7 +861,14 @@ def get_version(package_name, pre_version=None):
     if version:
         return version
     version = _get_version_from_git(pre_version)
+    # Handle http://bugs.python.org/issue11638
+    # version will either be an empty unicode string or a valid
+    # unicode version string, but either way it's unicode and needs to
+    # be encoded.
+    if sys.version_info[0] == 2:
+        version = version.encode('utf-8')
     if version:
         return version
     raise Exception("Versioning for this project requires either an sdist"
-                    " tarball, or access to an upstream git repository.")
+                    " tarball, or access to an upstream git repository."
+                    " Are you sure that git is installed?")

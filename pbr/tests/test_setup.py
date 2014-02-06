@@ -33,45 +33,10 @@ import fixtures
 import testscenarios
 
 from pbr import packaging
-from pbr import tests
+from pbr.tests import base
 
 
-class EmailTestCase(tests.BaseTestCase):
-
-    def test_str_dict_replace(self):
-        string = 'Johnnie T. Hozer'
-        mapping = {'T.': 'The'}
-        self.assertEqual('Johnnie The Hozer',
-                         packaging.canonicalize_emails(string, mapping))
-
-
-class MailmapTestCase(tests.BaseTestCase):
-
-    def setUp(self):
-        super(MailmapTestCase, self).setUp()
-        self.root_dir = self.useFixture(fixtures.TempDir()).path
-        self.mailmap = os.path.join(self.root_dir, '.mailmap')
-
-    def test_mailmap_with_fullname(self):
-        with open(self.mailmap, 'w') as mm_fh:
-            mm_fh.write("Foo Bar <email@foo.com> Foo Bar <email@bar.com>\n")
-        self.assertEqual({'<email@bar.com>': '<email@foo.com>'},
-                         packaging.read_git_mailmap(self.root_dir))
-
-    def test_mailmap_with_firstname(self):
-        with open(self.mailmap, 'w') as mm_fh:
-            mm_fh.write("Foo <email@foo.com> Foo <email@bar.com>\n")
-        self.assertEqual({'<email@bar.com>': '<email@foo.com>'},
-                         packaging.read_git_mailmap(self.root_dir))
-
-    def test_mailmap_with_noname(self):
-        with open(self.mailmap, 'w') as mm_fh:
-            mm_fh.write("<email@foo.com> <email@bar.com>\n")
-        self.assertEqual({'<email@bar.com>': '<email@foo.com>'},
-                         packaging.read_git_mailmap(self.root_dir))
-
-
-class SkipFileWrites(tests.BaseTestCase):
+class SkipFileWrites(base.BaseTestCase):
 
     scenarios = [
         ('changelog_option_true',
@@ -134,8 +99,20 @@ class SkipFileWrites(tests.BaseTestCase):
             (self.option_value.lower() in packaging.TRUE_VALUES
              or self.env_value is not None))
 
+_changelog_content = """04316fe (review/monty_taylor/27519) Make python
+378261a Add an integration test script.
+3c373ac (HEAD, tag: 2013.2.rc2, tag: 2013.2, milestone-proposed) Merge "Lib
+182feb3 (tag: 0.5.17) Fix pip invocation for old versions of pip.
+fa4f46e (tag: 0.5.16) Remove explicit depend on distribute.
+d1c53dd Use pip instead of easy_install for installation.
+a793ea1 Merge "Skip git-checkout related tests when .git is missing"
+6c27ce7 Skip git-checkout related tests when .git is missing
+04984a5 Refactor hooks file.
+a65e8ee (tag: 0.5.14, tag: 0.5.13) Remove jinja pin.
+"""
 
-class GitLogsTest(tests.BaseTestCase):
+
+class GitLogsTest(base.BaseTestCase):
 
     def setUp(self):
         super(GitLogsTest, self).setUp()
@@ -148,42 +125,35 @@ class GitLogsTest(tests.BaseTestCase):
             fixtures.EnvironmentVariable('SKIP_WRITE_GIT_CHANGELOG'))
 
     def test_write_git_changelog(self):
-        exist_files = [os.path.join(self.root_dir, f)
-                       for f in (".git", ".mailmap")]
-        self.useFixture(fixtures.MonkeyPatch(
-            "os.path.exists",
-            lambda path: os.path.abspath(path) in exist_files))
         self.useFixture(fixtures.FakePopen(lambda _: {
-            "stdout": BytesIO("Author: Foo Bar "
-                              "<email@bar.com>\n".encode('utf-8'))
+            "stdout": BytesIO(_changelog_content.encode('utf-8'))
         }))
-
-        def _fake_read_git_mailmap(*args):
-            return {"email@bar.com": "email@foo.com"}
-
-        self.useFixture(fixtures.MonkeyPatch("pbr.packaging.read_git_mailmap",
-                                             _fake_read_git_mailmap))
 
         packaging.write_git_changelog(git_dir=self.git_dir,
                                       dest_dir=self.temp_path)
 
         with open(os.path.join(self.temp_path, "ChangeLog"), "r") as ch_fh:
-            self.assertTrue("email@foo.com" in ch_fh.read())
-
-    def _fake_log_output(self, cmd, mapping):
-        for (k, v) in mapping.items():
-            if cmd.startswith(k):
-                return v.encode('utf-8')
-        return b""
+            changelog_contents = ch_fh.read()
+            self.assertIn("2013.2", changelog_contents)
+            self.assertIn("0.5.17", changelog_contents)
+            self.assertIn("------", changelog_contents)
+            self.assertIn("Refactor hooks file", changelog_contents)
+            self.assertNotIn("Refactor hooks file.", changelog_contents)
+            self.assertNotIn("182feb3", changelog_contents)
+            self.assertNotIn("review/monty_taylor/27519", changelog_contents)
+            self.assertNotIn("0.5.13", changelog_contents)
+            self.assertNotIn('Merge "', changelog_contents)
 
     def test_generate_authors(self):
-        author_old = "Foo Foo <email@foo.com>"
-        author_new = "Bar Bar <email@bar.com>"
-        co_author = "Foo Bar <foo@bar.com>"
-        co_author_by = "Co-authored-by: " + co_author
+        author_old = u"Foo Foo <email@foo.com>"
+        author_new = u"Bar Bar <email@bar.com>"
+        co_author = u"Foo Bar <foo@bar.com>"
+        co_author_by = u"Co-authored-by: " + co_author
 
-        git_log_cmd = ("git --git-dir=%s log --format" % self.git_dir)
-        git_co_log_cmd = ("git log --git-dir=%s" % self.git_dir)
+        git_log_cmd = (
+            "git --git-dir=%s log --use-mailmap --format=%%aN <%%aE>"
+            % self.git_dir)
+        git_co_log_cmd = ("git --git-dir=%s log" % self.git_dir)
         git_top_level = "git rev-parse --show-toplevel"
         cmd_map = {
             git_log_cmd: author_new,
@@ -197,10 +167,12 @@ class GitLogsTest(tests.BaseTestCase):
             "os.path.exists",
             lambda path: os.path.abspath(path) in exist_files))
 
-        self.useFixture(fixtures.FakePopen(lambda proc_args: {
-            "stdout": BytesIO(
-                self._fake_log_output(proc_args["args"][2], cmd_map))
-        }))
+        def _fake_run_shell_command(cmd, **kwargs):
+            return cmd_map[" ".join(cmd)]
+
+        self.useFixture(fixtures.MonkeyPatch(
+            "pbr.packaging._run_shell_command",
+            _fake_run_shell_command))
 
         with open(os.path.join(self.temp_path, "AUTHORS.in"), "w") as auth_fh:
             auth_fh.write("%s\n" % author_old)
@@ -215,7 +187,7 @@ class GitLogsTest(tests.BaseTestCase):
             self.assertTrue(co_author in authors)
 
 
-class BuildSphinxTest(tests.BaseTestCase):
+class BuildSphinxTest(base.BaseTestCase):
 
     scenarios = [
         ('true_autodoc_caps',
@@ -241,7 +213,7 @@ class BuildSphinxTest(tests.BaseTestCase):
         pkg_fixture = fixtures.PythonPackage(
             "fake_package", [("fake_module.py", b"")])
         self.useFixture(pkg_fixture)
-        self.useFixture(tests.DiveDir(pkg_fixture.base))
+        self.useFixture(base.DiveDir(pkg_fixture.base))
 
     def test_build_doc(self):
         if self.has_opt:
@@ -256,8 +228,41 @@ class BuildSphinxTest(tests.BaseTestCase):
             os.path.exists(
                 "api/fake_package.fake_module.rst") == self.has_autodoc)
 
+    def test_builders_config(self):
+        if self.has_opt:
+            self.distr.command_options["pbr"] = {
+                "autodoc_index_modules": ('setup.cfg', self.autodoc)}
 
-class ParseRequirementsTest(tests.BaseTestCase):
+        build_doc = packaging.LocalBuildDoc(self.distr)
+        build_doc.finalize_options()
+
+        self.assertEqual(2, len(build_doc.builders))
+        self.assertIn('html', build_doc.builders)
+        self.assertIn('man', build_doc.builders)
+
+        build_doc = packaging.LocalBuildDoc(self.distr)
+        build_doc.builders = ''
+        build_doc.finalize_options()
+
+        self.assertEqual('', build_doc.builders)
+
+        build_doc = packaging.LocalBuildDoc(self.distr)
+        build_doc.builders = 'man'
+        build_doc.finalize_options()
+
+        self.assertEqual(1, len(build_doc.builders))
+        self.assertIn('man', build_doc.builders)
+
+        build_doc = packaging.LocalBuildDoc(self.distr)
+        build_doc.builders = 'html,man,doctest'
+        build_doc.finalize_options()
+
+        self.assertIn('html', build_doc.builders)
+        self.assertIn('man', build_doc.builders)
+        self.assertIn('doctest', build_doc.builders)
+
+
+class ParseRequirementsTest(base.BaseTestCase):
 
     def setUp(self):
         super(ParseRequirementsTest, self).setUp()
@@ -305,6 +310,20 @@ class ParseRequirementsTest(tests.BaseTestCase):
         if sys.version_info >= (2, 7):
             self.assertEqual([], packaging.parse_requirements([self.tmp_file]))
 
+    def test_parse_requirements_removes_versioned_ordereddict(self):
+        self.useFixture(fixtures.MonkeyPatch('sys.version_info', (2, 7)))
+        with open(self.tmp_file, 'w') as fh:
+            fh.write("ordereddict==1.0.1")
+        self.assertEqual([], packaging.parse_requirements([self.tmp_file]))
+
+    def test_parse_requirements_keeps_versioned_ordereddict(self):
+        self.useFixture(fixtures.MonkeyPatch('sys.version_info', (2, 6)))
+        with open(self.tmp_file, 'w') as fh:
+            fh.write("ordereddict==1.0.1")
+        self.assertEqual([
+            "ordereddict==1.0.1"],
+            packaging.parse_requirements([self.tmp_file]))
+
     def test_parse_requirements_override_with_env(self):
         with open(self.tmp_file, 'w') as fh:
             fh.write("foo\nbar")
@@ -333,8 +352,24 @@ class ParseRequirementsTest(tests.BaseTestCase):
         self.assertEqual(['foobar', 'foobaz'],
                          packaging.parse_requirements([self.tmp_file]))
 
+    def test_parse_requirements_python_version(self):
+        with open("requirements-py%d.txt" % sys.version_info[0],
+                  "w") as fh:
+            fh.write("# this is a comment\nfoobar\n# and another one\nfoobaz")
+        self.assertEqual(['foobar', 'foobaz'],
+                         packaging.parse_requirements())
 
-class ParseDependencyLinksTest(tests.BaseTestCase):
+    def test_parse_requirements_right_python_version(self):
+        with open("requirements-py1.txt", "w") as fh:
+            fh.write("thisisatrap")
+        with open("requirements-py%d.txt" % sys.version_info[0],
+                  "w") as fh:
+            fh.write("# this is a comment\nfoobar\n# and another one\nfoobaz")
+        self.assertEqual(['foobar', 'foobaz'],
+                         packaging.parse_requirements())
+
+
+class ParseDependencyLinksTest(base.BaseTestCase):
 
     def setUp(self):
         super(ParseDependencyLinksTest, self).setUp()
