@@ -32,6 +32,6 @@ override_dh_auto_clean:
 override_dh_auto_test:
 ifeq (,$(findstring nocheck, $(DEB_BUILD_OPTIONS)))
 	set -e && for vers in $(PYTHONS) $(PYTHON3S) ; do \
-		python$$vers setup.py testr --slowest --testr-args='--subunit  ' || true ; \
+		python$$vers setup.py testr --slowest || true ; \
 	done
 endif
