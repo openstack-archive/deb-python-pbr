@@ -1,6 +1,7 @@
-python-pbr (0.6-1) unstable; urgency=medium
+python-pbr (0.6-1) experimental; urgency=medium
 
   * New upstream release.
+  * Uploading to experimental.
   * Standards-Version: is now 3.9.5.
   * Patch upstream code to removes unicode strings which are incompatible with
     Python 3.2.
