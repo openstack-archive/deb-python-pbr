@@ -15,6 +15,7 @@ Build-Depends: debhelper (>= 9),
                python-coverage (>= 3.6),
                python-fixtures (>= 0.3.12),
                python-mock (>= 1.0),
+               python-six (>= 1.5.2),
                python-setuptools,
                python-setuptools-git,
                python-sphinx,
@@ -24,6 +25,7 @@ Build-Depends: debhelper (>= 9),
                python-testtools (>= 0.9.32),
                python3-all,
                python3-d2to1 (>= 0.2.10),
+               python3-six (>= 1.5.2),
                python3-setuptools,
                subunit,
                testrepository (>= 0.0.17)
@@ -35,7 +37,7 @@ Homepage: http://pypi.python.org/pypi/pbr
 Package: python-pbr
 Architecture: all
 Pre-Depends: dpkg (>= 1.15.6~)
-Depends: ${misc:Depends}, ${python:Depends}
+Depends: python-six (>= 1.5.2), ${misc:Depends}, ${python:Depends}
 Recommends: ${python:Recommends}
 Description: inject useful and sensible default behaviors into setuptools - Python 2.x
  PBR (Python Build Reasonableness) is a library that injects some useful and
@@ -63,7 +65,7 @@ Description: inject useful and sensible default behaviors into setuptools - Pyth
 Package: python3-pbr
 Architecture: all
 Pre-Depends: dpkg (>= 1.15.6~)
-Depends: ${misc:Depends}, ${python3:Depends}
+Depends: python3-six (>= 1.5.2), ${misc:Depends}, ${python3:Depends}
 Recommends: ${python3:Recommends}
 Description: inject useful and sensible default behaviors into setuptools - Python 3.x
  PBR (Python Build Reasonableness) is a library that injects some useful and
