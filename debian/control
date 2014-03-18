@@ -18,7 +18,7 @@ Build-Depends: debhelper (>= 9),
                python-setuptools,
                python-setuptools-git,
                python-sphinx,
-               python-subunit,
+               python-subunit (>= 0.0.18),
                python-testresources,
                python-testscenarios (>= 0.4),
                python-testtools (>= 0.9.32),
@@ -26,7 +26,8 @@ Build-Depends: debhelper (>= 9),
                python3-d2to1 (>= 0.2.10),
                python3-setuptools,
                subunit,
-               testrepository (>= 0.0.17)
+               testrepository (>= 0.0.17),
+               subunit (>= 0.0.18)
 Standards-Version: 3.9.5
 Vcs-Browser: http://anonscm.debian.org/gitweb/?p=openstack/python-pbr.git
 Vcs-Git: git://anonscm.debian.org/openstack/python-pbr.git

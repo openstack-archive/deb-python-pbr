@@ -1,3 +1,9 @@
+python-pbr (0.6-2) experimental; urgency=medium
+
+  * Better unit test output (using subunit).
+
+ -- Thomas Goirand <zigo@debian.org>  Tue, 18 Mar 2014 06:22:40 +0000
+
 python-pbr (0.6-1) experimental; urgency=medium
 
   * New upstream release.

@@ -31,8 +31,10 @@ override_dh_auto_clean:
 
 override_dh_auto_test:
 ifeq (,$(findstring nocheck, $(DEB_BUILD_OPTIONS)))
-	set -e && for vers in $(PYTHONS) $(PYTHON3S) ; do \
-		echo "===> Now testing with Python $$vers <===" ; \
-		python$$vers setup.py testr --slowest || true ; \
-	done
+	set -e && \
+		TEMP_REZ=`mktemp -t` && \
+		python setup.py testr --slowest --testr-args='--subunit  ' \
+			| tee $$TEMP_REZ | subunit2pyunit || true ; \
+		cat $$TEMP_REZ | subunit-filter -s --no-passthrough | subunit-stats ; \
+		rm -f $$TEMP_REZ ;
 endif
