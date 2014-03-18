@@ -9,7 +9,7 @@ include /usr/share/openstack-pkg-tools/pkgos.make
 export OSLO_PACKAGE_VERSION=$(VERSION)
 
 %:
-	dh $@ --buildsystem=python_distutils --with python2,python3
+	dh $@ --buildsystem=python_distutils --with python2,python3,sphinxdoc
 
 override_dh_clean:
 	dh_clean -O--buildsystem=python_distutils
@@ -33,4 +33,10 @@ ifeq (,$(findstring nocheck, $(DEB_BUILD_OPTIONS)))
 			| tee $$TEMP_REZ | subunit2pyunit || true ; \
 		cat $$TEMP_REZ | subunit-filter -s --no-passthrough | subunit-stats ; \
 		rm -f $$TEMP_REZ ;
+endif
+
+override_dh_sphinxdoc:
+ifeq (,$(findstring nodocs, $(DEB_BUILD_OPTIONS)))
+	sphinx-build -b html doc/source $(CURDIR)/debian/python-pbr-doc/usr/share/doc/python-pbr-doc/html
+	dh_sphinxdoc -O--buildsystem=python_distutils
 endif

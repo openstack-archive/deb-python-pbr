@@ -1,0 +1,9 @@
+Document: python-pbr-doc
+Title: PBR Documentation
+Author: OpenStack
+Abstract: Sphinx documentation for PBR
+Section: Programming/Python
+
+Format: HTML
+Index: /usr/share/doc/python-pbr-doc/html/index.html
+Files: /usr/share/doc/python-pbr-doc/html/*
