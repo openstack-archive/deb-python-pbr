@@ -9,10 +9,11 @@ include /usr/share/openstack-pkg-tools/pkgos.make
 export OSLO_PACKAGE_VERSION=$(VERSION)
 
 %:
-	dh $@  --with python2,python3
+	dh $@ --buildsystem=python_distutils --with python2,python3
 
 override_dh_clean:
-	dh_clean
+	dh_clean -O--buildsystem=python_distutils
+	rm -rf .testrepository build __pycache__
 
 override_dh_auto_install:
 	set -e && for pyvers in $(PYTHONS); do \
@@ -23,11 +24,6 @@ override_dh_auto_install:
 		python$$pyvers setup.py install --install-layout=deb \
 			--root $(CURDIR)/debian/python3-pbr; \
 	done
-
-override_dh_auto_clean:
-	dh_auto_clean
-	rm -rf build
-	rm -rf *.egg-info __pycache__
 
 override_dh_auto_test:
 ifeq (,$(findstring nocheck, $(DEB_BUILD_OPTIONS)))

@@ -1,6 +1,7 @@
 python-pbr (0.6-2) experimental; urgency=medium
 
   * Better unit test output (using subunit).
+  * Added extend-diff-ignore = "^[^/]*[.]egg-info/" in debian/source/options.
 
  -- Thomas Goirand <zigo@debian.org>  Tue, 18 Mar 2014 06:22:40 +0000
 
