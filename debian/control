@@ -12,13 +12,13 @@ Build-Depends: debhelper (>= 9),
                git,
                openstack-pkg-tools,
                python-all (>= 2.6.6-3~),
-               python-dev (>= 2.6.6-3~),
                python-coverage (>= 3.6),
+               python-dev (>= 2.6.6-3~),
                python-fixtures (>= 0.3.12),
                python-mock (>= 1.0),
-               python-six (>= 1.5.2),
                python-setuptools,
                python-setuptools-git,
+               python-six (>= 1.5.2),
                python-sphinx,
                python-subunit (>= 0.0.18),
                python-testresources,
@@ -26,8 +26,8 @@ Build-Depends: debhelper (>= 9),
                python-testtools (>= 0.9.32),
                python3-all,
                python3-d2to1 (>= 0.2.10),
-               python3-six (>= 1.5.2),
                python3-setuptools,
+               python3-six (>= 1.5.2),
                subunit (>= 0.0.18),
                testrepository (>= 0.0.17)
 Standards-Version: 3.9.5
@@ -38,7 +38,10 @@ Homepage: http://pypi.python.org/pypi/pbr
 Package: python-pbr
 Architecture: all
 Pre-Depends: dpkg (>= 1.15.6~)
-Depends: python-six (>= 1.5.2), ${misc:Depends}, ${python:Depends}
+Depends: python-pip (>= 1.4),
+         python-six (>= 1.5.2),
+         ${misc:Depends},
+         ${python:Depends}
 Recommends: ${python:Recommends}
 Description: inject useful and sensible default behaviors into setuptools - Python 2.x
  PBR (Python Build Reasonableness) is a library that injects some useful and
@@ -66,7 +69,10 @@ Description: inject useful and sensible default behaviors into setuptools - Pyth
 Package: python3-pbr
 Architecture: all
 Pre-Depends: dpkg (>= 1.15.6~)
-Depends: python3-six (>= 1.5.2), ${misc:Depends}, ${python3:Depends}
+Depends: python3-pip (>= 1.4),
+         python3-six (>= 1.5.2),
+         ${misc:Depends},
+         ${python3:Depends}
 Recommends: ${python3:Recommends}
 Description: inject useful and sensible default behaviors into setuptools - Python 3.x
  PBR (Python Build Reasonableness) is a library that injects some useful and
@@ -93,7 +99,7 @@ Description: inject useful and sensible default behaviors into setuptools - Pyth
 
 Package: python-pbr-doc
 Section: doc
-Architecture: all   
+Architecture: all
 Pre-Depends: dpkg (>= 1.15.6~)
 Depends: ${misc:Depends}, ${sphinxdoc:Depends}
 Description: inject useful and sensible default behaviors into setuptools - doc
@@ -101,20 +107,20 @@ Description: inject useful and sensible default behaviors into setuptools - doc
  sensible default behaviors into your setuptools run. PBR can:
   * Manage version number bad on git revisions and tags (Version file).
   * Generate AUTHORS file from git log
-  * Generate ChangeLog from git log   
+  * Generate ChangeLog from git log
   * Generate Sphinx autodoc stub files for your whole module
   * Store your dependencies in a pip requirements file
   * Use your README file as a long_description
   * Smartly find packages under your root package
  .
  PBR is only mildly configurable. The basic idea is that there's a decent way
- to run things and if you do, you should reap the rewards, because then it's 
+ to run things and if you do, you should reap the rewards, because then it's
  simple and repeatable. If you want to do things differently, cool! But you've
- already got the power of Python at your fingertips, so you don't really need 
+ already got the power of Python at your fingertips, so you don't really need
  PBR.
- .   
+ .
  PBR builds on top of `d2to1` to provide for declarative configuration. It then
- filters the `setup.cfg` data through a setup hook to fill in default values   
+ filters the `setup.cfg` data through a setup hook to fill in default values
  and provide more sensible behaviors.
  .
  This package provides the documentation.
