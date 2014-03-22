@@ -18,7 +18,7 @@ Last-Update: 2014-03-22
                          underline = len(tag) * '-'
                          if not first_line:
 -                            changelog_file.write(u'\n')
-+                            changelog_file.write(six.u('\n'))
++                            changelog_file.write(unicode('\n'))
                          changelog_file.write(
                              ("%(tag)s\n%(underline)s\n\n" %
                               dict(tag=tag,
@@ -40,10 +40,10 @@ Last-Update: 2014-03-22
 -        author_new = u"Bar Bar <email@bar.com>"
 -        co_author = u"Foo Bar <foo@bar.com>"
 -        co_author_by = u"Co-authored-by: " + co_author
-+        author_old = six.u("Foo Foo <email@foo.com>")
-+        author_new = six.u("Bar Bar <email@bar.com>")
-+        co_author = six.u("Foo Bar <foo@bar.com>")
-+        co_author_by = six.u("Co-authored-by: ") + co_author
++        author_old = unicode("Foo Foo <email@foo.com>")
++        author_new = unicode("Bar Bar <email@bar.com>")
++        co_author = unicode("Foo Bar <foo@bar.com>")
++        co_author_by = unicode("Co-authored-by: ") + co_author
  
          git_log_cmd = (
              "git --git-dir=%s log --use-mailmap --format=%%aN <%%aE>"
