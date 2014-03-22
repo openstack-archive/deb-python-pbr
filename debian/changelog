@@ -1,6 +1,7 @@
 python-pbr (0.7.0-1) experimental; urgency=low
 
   * New upstream release.
+  * Review patch for using six to fix unicode in Python 3.2.
 
  -- Thomas Goirand <zigo@debian.org>  Sat, 22 Mar 2014 16:10:43 +0800
 

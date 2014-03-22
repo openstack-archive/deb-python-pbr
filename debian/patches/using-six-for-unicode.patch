@@ -1,0 +1,49 @@
+Description: Stuff doesn't work on Python 3.2, need to use six to fix
+Author: Thomas Goirand <zigo@debian.org>
+Forwarded: no
+Last-Update: 2014-03-22
+
+--- python-pbr-0.7.0.orig/pbr/packaging.py
++++ python-pbr-0.7.0/pbr/packaging.py
+@@ -28,6 +28,7 @@ import os
+ import re
+ import subprocess
+ import sys
++import six
+ 
+ from distutils.command import install as du_install
+ import distutils.errors
+@@ -280,7 +281,7 @@ def write_git_changelog(git_dir=None, de
+ 
+                         underline = len(tag) * '-'
+                         if not first_line:
+-                            changelog_file.write(u'\n')
++                            changelog_file.write(six.u('\n'))
+                         changelog_file.write(
+                             ("%(tag)s\n%(underline)s\n\n" %
+                              dict(tag=tag,
+--- python-pbr-0.7.0.orig/pbr/tests/test_setup.py
++++ python-pbr-0.7.0/pbr/tests/test_setup.py
+@@ -21,6 +21,7 @@ from __future__ import print_function
+ import os
+ import sys
+ import tempfile
++import six
+ 
+ try:
+     import cStringIO as io
+@@ -145,10 +146,10 @@ class GitLogsTest(base.BaseTestCase):
+             self.assertNotIn('Merge "', changelog_contents)
+ 
+     def test_generate_authors(self):
+-        author_old = u"Foo Foo <email@foo.com>"
+-        author_new = u"Bar Bar <email@bar.com>"
+-        co_author = u"Foo Bar <foo@bar.com>"
+-        co_author_by = u"Co-authored-by: " + co_author
++        author_old = six.u("Foo Foo <email@foo.com>")
++        author_new = six.u("Bar Bar <email@bar.com>")
++        co_author = six.u("Foo Bar <foo@bar.com>")
++        co_author_by = six.u("Co-authored-by: ") + co_author
+ 
+         git_log_cmd = (
+             "git --git-dir=%s log --use-mailmap --format=%%aN <%%aE>"

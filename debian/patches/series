@@ -1,2 +1,2 @@
-fix-strings-to-use-six.unicode.patch
 no-intersphinx.patch
+using-six-for-unicode.patch
