@@ -23,6 +23,7 @@ override_dh_auto_install:
 	set -e && for pyvers in $(PYTHON3S); do \
 		python$$pyvers setup.py install --install-layout=deb \
 			--root $(CURDIR)/debian/python3-pbr; \
+		rm -rf $(CURDIR)/debian/python3-pbr/usr/lib/python3/dist-packages/pbr/tests ; \
 	done
 
 override_dh_auto_test:
