@@ -1,2 +1,3 @@
 no-intersphinx.patch
 using-six-for-unicode.patch
+neutralize-test_write_git_changelog.patch
