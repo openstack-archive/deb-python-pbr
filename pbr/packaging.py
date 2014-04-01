@@ -87,9 +87,11 @@ def _pip_install(links, requires, root=None, option_dict=dict()):
     for link in links:
         cmd.append("-f")
         cmd.append(link)
+
+    # NOTE(ociuhandu): popen on Windows does not accept unicode strings
     _run_shell_command(
         cmd + requires,
-        throw_on_error=True, buffer=False, env=dict(PIP_USE_WHEEL="true"))
+        throw_on_error=True, buffer=False, env=dict(PIP_USE_WHEEL=b"true"))
 
 
 def _any_existing(file_list):
@@ -280,7 +282,7 @@ def write_git_changelog(git_dir=None, dest_dir=os.path.curdir,
 
                         underline = len(tag) * '-'
                         if not first_line:
-                            changelog_file.write(u'\n')
+                            changelog_file.write('\n')
                         changelog_file.write(
                             ("%(tag)s\n%(underline)s\n\n" %
                              dict(tag=tag,
