@@ -1,6 +1,7 @@
 python-pbr (0.8.0-1) experimental; urgency=low
 
   * New upstream release.
+  * Running the unit tests with all available Python versions.
 
  -- Thomas Goirand <zigo@debian.org>  Tue, 01 Apr 2014 13:53:59 +0800
 
