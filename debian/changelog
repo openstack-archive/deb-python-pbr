@@ -5,6 +5,8 @@ python-pbr (0.8.0-1) unstable; urgency=low
   * Running the unit tests with Python 2.7 and all available Python3 versions.
   * Fixed missing BSD license for some files (Closes: #742123).
   * Review patch for using six to fix unicode in Python 3.2.
+  * The package now build-conflicts on itself (otherwise, there's some unit
+    tests failures).
 
  -- Thomas Goirand <zigo@debian.org>  Fri, 18 Apr 2014 00:02:20 +0800
 
