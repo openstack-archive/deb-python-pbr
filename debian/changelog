@@ -1,17 +1,12 @@
-python-pbr (0.8.0-1) experimental; urgency=low
+python-pbr (0.8.0-1) unstable; urgency=low
 
   * New upstream release.
+  * Uploading to unstable.
   * Running the unit tests with Python 2.7 and all available Python3 versions.
   * Fixed missing BSD license for some files (Closes: #742123).
-
- -- Thomas Goirand <zigo@debian.org>  Tue, 01 Apr 2014 13:53:59 +0800
-
-python-pbr (0.7.0-1) experimental; urgency=low
-
-  * New upstream release.
   * Review patch for using six to fix unicode in Python 3.2.
 
- -- Thomas Goirand <zigo@debian.org>  Sat, 22 Mar 2014 16:10:43 +0800
+ -- Thomas Goirand <zigo@debian.org>  Fri, 18 Apr 2014 00:02:20 +0800
 
 python-pbr (0.6-1) experimental; urgency=medium
 
