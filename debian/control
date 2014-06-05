@@ -56,7 +56,7 @@ Recommends: ${python:Recommends}
 Description: inject useful and sensible default behaviors into setuptools - Python 2.x
  PBR (Python Build Reasonableness) is a library that injects some useful and
  sensible default behaviors into your setuptools run. PBR can:
-  * Manage version number bad on git revisions and tags (Version file).
+  * Manage version number based on git revisions and tags (Version file).
   * Generate AUTHORS file from git log
   * Generate ChangeLog from git log
   * Generate Sphinx autodoc stub files for your whole module
@@ -87,7 +87,7 @@ Recommends: ${python3:Recommends}
 Description: inject useful and sensible default behaviors into setuptools - Python 3.x
  PBR (Python Build Reasonableness) is a library that injects some useful and
  sensible default behaviors into your setuptools run. PBR can:
-  * Manage version number bad on git revisions and tags (Version file).
+  * Manage version number based on git revisions and tags (Version file).
   * Generate AUTHORS file from git log
   * Generate ChangeLog from git log
   * Generate Sphinx autodoc stub files for your whole module
@@ -115,7 +115,7 @@ Depends: ${misc:Depends}, ${sphinxdoc:Depends}
 Description: inject useful and sensible default behaviors into setuptools - doc
  PBR (Python Build Reasonableness) is a library that injects some useful and
  sensible default behaviors into your setuptools run. PBR can:
-  * Manage version number bad on git revisions and tags (Version file).
+  * Manage version number based on git revisions and tags (Version file).
   * Generate AUTHORS file from git log
   * Generate ChangeLog from git log
   * Generate Sphinx autodoc stub files for your whole module

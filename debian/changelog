@@ -1,3 +1,9 @@
+python-pbr (0.8.0-2) unstable; urgency=medium
+
+  * Fixup long description typo (Closes: #750543).
+
+ -- Thomas Goirand <zigo@debian.org>  Thu, 05 Jun 2014 14:26:24 +0800
+
 python-pbr (0.8.0-1) unstable; urgency=low
 
   * New upstream release.
