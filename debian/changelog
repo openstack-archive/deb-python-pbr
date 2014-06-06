@@ -1,6 +1,7 @@
 python-pbr (0.8.2-1) unstable; urgency=medium
 
   * New upstream release (Closes: #750684).
+  * Removed no-u-string-for-python-3.2.patch.
 
  -- Thomas Goirand <zigo@debian.org>  Fri, 06 Jun 2014 10:37:57 +0800
 
