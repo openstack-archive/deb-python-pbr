@@ -28,15 +28,16 @@ override_dh_auto_install:
 
 override_dh_auto_test:
 ifeq (,$(findstring nocheck, $(DEB_BUILD_OPTIONS)))
-	set -e && \
-		for i in 2.7 $(PYTHON3S) ; do \
-			TEMP_REZ=`mktemp -t` && \
-			echo "===> Testing with Python $$i" ; \
-			PYTHON=python$$i PYTHONPATH=. python setup.py testr --slowest --testr-args='--subunit  ' \
-				| tee $$TEMP_REZ | subunit2pyunit || true ; \
-			cat $$TEMP_REZ | subunit-filter -s --no-passthrough | subunit-stats ; \
-			rm -f $$TEMP_REZ ; \
-		done
+	set -e && for i in 2.7 $(PYTHON3S) ; do \
+		echo "===> Testing with Python $$i" ; \
+		rm -rf .testrepository ; \
+		testr init ; \
+		TEMP_REZ=`mktemp -t` && \
+			PYTHON=python$$i PYTHONPATH=$(CURDIR) testr run --subunit 'tests\.(?!.*test_console_script_.*)' | tee $$TEMP_REZ | subunit2pyunit ; \
+		cat $$TEMP_REZ | subunit-filter -s --no-passthrough | subunit-stats ; \
+		rm -f $$TEMP_REZ ; \
+		testr slowest ; \
+	done
 endif
 
 override_dh_sphinxdoc:
