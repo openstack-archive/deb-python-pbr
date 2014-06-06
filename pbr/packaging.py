@@ -125,6 +125,13 @@ def parse_requirements(requirements_files=None):
         if (not line.strip()) or line.startswith('#'):
             continue
 
+        # Handle nested requirements files such as:
+        # -r other-requirements.txt
+        if line.startswith('-r'):
+            req_file = line.partition(' ')[2]
+            requirements += parse_requirements([req_file])
+            continue
+
         try:
             project_name = pkg_resources.Requirement.parse(line).project_name
         except ValueError:
@@ -315,7 +322,7 @@ def generate_authors(git_dir=None, dest_dir='.', option_dict=dict()):
             authors = []
 
             # don't include jenkins email address in AUTHORS file
-            git_log_cmd = ['log', '--use-mailmap', '--format=%aN <%aE>']
+            git_log_cmd = ['log', '--format=%aN <%aE>']
             authors += _run_git_command(git_log_cmd, git_dir).split('\n')
             authors = [a for a in authors if not re.search(ignore_emails, a)]
 
@@ -662,9 +669,9 @@ try:
             autoindex_filename = os.path.join(source_dir, 'autoindex.rst')
             with open(autoindex_filename, 'w') as autoindex:
                 autoindex.write(""".. toctree::
-    :maxdepth: 1
+   :maxdepth: 1
 
-    """)
+""")
                 for module in module_list:
                     output_filename = os.path.join(source_dir,
                                                    "%s.rst" % module)

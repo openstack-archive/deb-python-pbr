@@ -39,6 +39,7 @@
 # BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
 
 import os
+import tempfile
 
 import fixtures
 import mock
@@ -47,16 +48,36 @@ from pbr import packaging
 from pbr.tests import base
 
 
+class TestRepo(fixtures.Fixture):
+    """A git repo for testing with.
+
+    Use of TempHomeDir with this fixture is strongly recommended as due to the
+    lack of config --local in older gits, it will write to the users global
+    configuration without TempHomeDir.
+    """
+
+    def __init__(self, basedir):
+        super(TestRepo, self).__init__()
+        self._basedir = basedir
+
+    def setUp(self):
+        super(TestRepo, self).setUp()
+        base._run_cmd(['git', 'init', '.'], self._basedir)
+        base._run_cmd(
+            ['git', 'config', '--global', 'user.email', 'example@example.com'],
+            self._basedir)
+        base._run_cmd(['git', 'add', '.'], self._basedir)
+
+    def commit(self):
+        base._run_cmd(['git', 'commit', '-m', 'test commit'], self._basedir)
+
+
 class TestPackagingInGitRepoWithCommit(base.BaseTestCase):
 
     def setUp(self):
         super(TestPackagingInGitRepoWithCommit, self).setUp()
-        self.useFixture(fixtures.TempHomeDir())
-        self._run_cmd(
-            'git', ['config', '--global', 'user.email', 'nobody@example.com'])
-        self._run_cmd('git', ['init', '.'])
-        self._run_cmd('git', ['add', '.'])
-        self._run_cmd('git', ['commit', '-m', 'test commit'])
+        repo = self.useFixture(TestRepo(self.package_dir))
+        repo.commit()
         self.run_setup('sdist')
         return
 
@@ -77,8 +98,7 @@ class TestPackagingInGitRepoWithoutCommit(base.BaseTestCase):
 
     def setUp(self):
         super(TestPackagingInGitRepoWithoutCommit, self).setUp()
-        self._run_cmd('git', ['init', '.'])
-        self._run_cmd('git', ['add', '.'])
+        self.useFixture(TestRepo(self.package_dir))
         self.run_setup('sdist')
         return
 
@@ -126,3 +146,17 @@ class TestPresenceOfGit(base.BaseTestCase):
                                '_run_shell_command') as _command:
             _command.side_effect = OSError
             self.assertEqual(False, packaging._git_is_installed())
+
+
+class TestNestedRequirements(base.BaseTestCase):
+
+    def test_nested_requirement(self):
+        tempdir = tempfile.mkdtemp()
+        requirements = os.path.join(tempdir, 'requirements.txt')
+        nested = os.path.join(tempdir, 'nested.txt')
+        with open(requirements, 'w') as f:
+            f.write('-r ' + nested)
+        with open(nested, 'w') as f:
+            f.write('pbr')
+        result = packaging.parse_requirements([requirements])
+        self.assertEqual(result, ['pbr'])

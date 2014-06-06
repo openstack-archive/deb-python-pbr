@@ -57,7 +57,7 @@ numbers and the way they change convey meaning about the underlying code
 and what has been modified from one version to the next.
 
 Linux Compatible Semantic Versioning is different from Semantic
-Versioning in that it does not employ the use of the hypen in ways that
+Versioning in that it does not employ the use of the hyphen in ways that
 are ambiguous when used with or adjacent to software packaged with dpkg or
 rpm. Instead, it draws from PEP440's approach of indicating pre-releases
 with leading characters in the version segment.
@@ -120,7 +120,7 @@ document are to be interpreted as described in `RFC
     version. Examples: 1.0.0.a1, 1.0.0.b99, 1.0.0.rc1000.
 
 #.  A development version MAY be denoted by appending a dot separated
-    indentifier immediately following the patch version.
+    identifier immediately following the patch version.
     The identifier MUST comprise the string dev followed by non-negative
     integer value. The identifier MUST NOT be empty. Development versions
     have a lower precedence than the associated normal version. A development
