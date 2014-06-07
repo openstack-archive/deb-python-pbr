@@ -3,6 +3,7 @@ python-pbr (0.8.2-1) unstable; urgency=medium
   * New upstream release (Closes: #750684).
   * Do not run unit tests which are downloading stuff from the net.
   * Added export http{s,}_proxy=127.0.0.1:9 to make sure there's no net access.
+  * Do not build-depends on python{3,}-all-dev anymore.
 
  -- Thomas Goirand <zigo@debian.org>  Fri, 06 Jun 2014 10:37:57 +0800
 
