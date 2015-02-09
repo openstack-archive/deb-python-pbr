@@ -23,14 +23,11 @@ Utilities with minimum-depends for use in setup.py
 from __future__ import unicode_literals
 
 import email
-import io
 import os
 import re
-import subprocess
 import sys
 
 from distutils.command import install as du_install
-import distutils.errors
 from distutils import log
 import pkg_resources
 from setuptools.command import easy_install
@@ -39,14 +36,11 @@ from setuptools.command import install
 from setuptools.command import install_scripts
 from setuptools.command import sdist
 
-try:
-    import cStringIO
-except ImportError:
-    import io as cStringIO
-
 from pbr import extra_files
+from pbr import git
+from pbr import options
+import pbr.pbr_json
 
-TRUE_VALUES = ('true', '1', 'yes')
 REQUIREMENTS_FILES = ('requirements.txt', 'tools/pip-requires')
 TEST_REQUIREMENTS_FILES = ('test-requirements.txt', 'tools/test-requires')
 
@@ -75,7 +69,7 @@ def append_text_list(config, key, text_list):
 
 
 def _pip_install(links, requires, root=None, option_dict=dict()):
-    if get_boolean_option(
+    if options.get_boolean_option(
             option_dict, 'skip_pip_install', 'SKIP_PIP_INSTALL'):
         return
     cmd = [sys.executable, '-m', 'pip.__init__', 'install']
@@ -86,7 +80,7 @@ def _pip_install(links, requires, root=None, option_dict=dict()):
         cmd.append(link)
 
     # NOTE(ociuhandu): popen on Windows does not accept unicode strings
-    _run_shell_command(
+    git._run_shell_command(
         cmd + requires,
         throw_on_error=True, buffer=False, env=dict(PIP_USE_WHEEL=b"true"))
 
@@ -177,203 +171,6 @@ def parse_dependency_links(requirements_files=None):
         elif re.match(r'\s*https?:', line):
             dependency_links.append(line)
     return dependency_links
-
-
-def _run_git_command(cmd, git_dir, **kwargs):
-    if not isinstance(cmd, (list, tuple)):
-        cmd = [cmd]
-    return _run_shell_command(
-        ['git', '--git-dir=%s' % git_dir] + cmd, **kwargs)
-
-
-def _run_shell_command(cmd, throw_on_error=False, buffer=True, env=None):
-    if buffer:
-        out_location = subprocess.PIPE
-        err_location = subprocess.PIPE
-    else:
-        out_location = None
-        err_location = None
-
-    newenv = os.environ.copy()
-    if env:
-        newenv.update(env)
-
-    output = subprocess.Popen(cmd,
-                              stdout=out_location,
-                              stderr=err_location,
-                              env=newenv)
-    out = output.communicate()
-    if output.returncode and throw_on_error:
-        raise distutils.errors.DistutilsError(
-            "%s returned %d" % (cmd, output.returncode))
-    if len(out) == 0 or not out[0] or not out[0].strip():
-        return ''
-    return out[0].strip().decode('utf-8')
-
-
-def _get_git_directory():
-    return _run_shell_command(['git', 'rev-parse', '--git-dir'])
-
-
-def _git_is_installed():
-    try:
-        # We cannot use 'which git' as it may not be available
-        # in some distributions, So just try 'git --version'
-        # to see if we run into trouble
-        _run_shell_command(['git', '--version'])
-    except OSError:
-        return False
-    return True
-
-
-def _get_highest_tag(tags):
-    """Find the highest tag from a list.
-
-    Pass in a list of tag strings and this will return the highest
-    (latest) as sorted by the pkg_resources version parser.
-    """
-    return max(tags, key=pkg_resources.parse_version)
-
-
-def get_boolean_option(option_dict, option_name, env_name):
-    return ((option_name in option_dict
-             and option_dict[option_name][1].lower() in TRUE_VALUES) or
-            str(os.getenv(env_name)).lower() in TRUE_VALUES)
-
-
-def write_git_changelog(git_dir=None, dest_dir=os.path.curdir,
-                        option_dict=dict()):
-    """Write a changelog based on the git changelog."""
-    should_skip = get_boolean_option(option_dict, 'skip_changelog',
-                                     'SKIP_WRITE_GIT_CHANGELOG')
-    if should_skip:
-        return
-
-    new_changelog = os.path.join(dest_dir, 'ChangeLog')
-    # If there's already a ChangeLog and it's not writable, just use it
-    if (os.path.exists(new_changelog)
-            and not os.access(new_changelog, os.W_OK)):
-        return
-    log.info('[pbr] Writing ChangeLog')
-    if git_dir is None:
-        git_dir = _get_git_directory()
-    if not git_dir:
-        return
-
-    log_cmd = ['log', '--oneline', '--decorate']
-    changelog = _run_git_command(log_cmd, git_dir)
-    first_line = True
-    with io.open(new_changelog, "w",
-                 encoding="utf-8") as changelog_file:
-        changelog_file.write("CHANGES\n=======\n\n")
-        for line in changelog.split('\n'):
-            line_parts = line.split()
-            if len(line_parts) < 2:
-                continue
-            # Tags are in a list contained in ()'s. If a commit
-            # subject that is tagged happens to have ()'s in it
-            # this will fail
-            if line_parts[1].startswith('(') and ')' in line:
-                msg = line.split(')')[1].strip()
-            else:
-                msg = " ".join(line_parts[1:])
-
-            if "tag:" in line:
-                tags = [
-                    tag.split(",")[0]
-                    for tag in line.split(")")[0].split("tag: ")[1:]]
-                tag = _get_highest_tag(tags)
-
-                underline = len(tag) * '-'
-                if not first_line:
-                    changelog_file.write('\n')
-                changelog_file.write(
-                    ("%(tag)s\n%(underline)s\n\n" %
-                     dict(tag=tag,
-                          underline=underline)))
-
-            if not msg.startswith("Merge "):
-                if msg.endswith("."):
-                    msg = msg[:-1]
-                changelog_file.write(
-                    ("* %(msg)s\n" % dict(msg=msg)))
-            first_line = False
-
-
-def generate_authors(git_dir=None, dest_dir='.', option_dict=dict()):
-    """Create AUTHORS file using git commits."""
-    should_skip = get_boolean_option(option_dict, 'skip_authors',
-                                     'SKIP_GENERATE_AUTHORS')
-    if should_skip:
-        return
-
-    old_authors = os.path.join(dest_dir, 'AUTHORS.in')
-    new_authors = os.path.join(dest_dir, 'AUTHORS')
-    # If there's already an AUTHORS file and it's not writable, just use it
-    if (os.path.exists(new_authors)
-            and not os.access(new_authors, os.W_OK)):
-        return
-    log.info('[pbr] Generating AUTHORS')
-    ignore_emails = '(jenkins@review|infra@lists|jenkins@openstack)'
-    if git_dir is None:
-        git_dir = _get_git_directory()
-    if git_dir:
-        authors = []
-
-        # don't include jenkins email address in AUTHORS file
-        git_log_cmd = ['log', '--format=%aN <%aE>']
-        authors += _run_git_command(git_log_cmd, git_dir).split('\n')
-        authors = [a for a in authors if not re.search(ignore_emails, a)]
-
-        # get all co-authors from commit messages
-        co_authors_out = _run_git_command('log', git_dir)
-        co_authors = re.findall('Co-authored-by:.+', co_authors_out,
-                                re.MULTILINE)
-        co_authors = [signed.split(":", 1)[1].strip()
-                      for signed in co_authors if signed]
-
-        authors += co_authors
-        authors = sorted(set(authors))
-
-        with open(new_authors, 'wb') as new_authors_fh:
-            if os.path.exists(old_authors):
-                with open(old_authors, "rb") as old_authors_fh:
-                    new_authors_fh.write(old_authors_fh.read())
-            new_authors_fh.write(('\n'.join(authors) + '\n')
-                                 .encode('utf-8'))
-
-
-def _find_git_files(dirname='', git_dir=None):
-    """Behave like a file finder entrypoint plugin.
-
-    We don't actually use the entrypoints system for this because it runs
-    at absurd times. We only want to do this when we are building an sdist.
-    """
-    file_list = []
-    if git_dir is None and _git_is_installed():
-        git_dir = _get_git_directory()
-    if git_dir:
-        log.info("[pbr] In git context, generating filelist from git")
-        file_list = _run_git_command(['ls-files', '-z'], git_dir)
-        file_list = file_list.split(b'\x00'.decode('utf-8'))
-    return [f for f in file_list if f]
-
-
-_rst_template = """%(heading)s
-%(underline)s
-
-.. automodule:: %(module)s
-  :members:
-  :undoc-members:
-  :show-inheritance:
-"""
-
-
-def _find_modules(arg, dirname, files):
-    for filename in files:
-        if filename.endswith('.py') and filename != '__init__.py':
-            arg["%s.%s" % (dirname.replace('/', '.'),
-                           filename[:-3])] = True
 
 
 class LocalInstall(install.install):
@@ -582,10 +379,10 @@ class LocalManifestMaker(egg_info.manifest_maker):
         self.filelist.append(self.template)
         self.filelist.append(self.manifest)
         self.filelist.extend(extra_files.get_extra_files())
-        should_skip = get_boolean_option(option_dict, 'skip_git_sdist',
-                                         'SKIP_GIT_SDIST')
+        should_skip = options.get_boolean_option(option_dict, 'skip_git_sdist',
+                                                 'SKIP_GIT_SDIST')
         if not should_skip:
-            rcfiles = _find_git_files()
+            rcfiles = git._find_git_files()
             if rcfiles:
                 self.filelist.extend(rcfiles)
         elif os.path.exists(self.manifest):
@@ -628,148 +425,22 @@ class LocalSDist(sdist.sdist):
 
     def run(self):
         option_dict = self.distribution.get_option_dict('pbr')
-        write_git_changelog(option_dict=option_dict)
-        generate_authors(option_dict=option_dict)
+        git.write_git_changelog(option_dict=option_dict)
+        git.generate_authors(option_dict=option_dict)
         # sdist.sdist is an old style class, can't use super()
         sdist.sdist.run(self)
 
 try:
-    from sphinx import apidoc
-    from sphinx import application
-    from sphinx import config
-    from sphinx import setup_command
-
-    class LocalBuildDoc(setup_command.BuildDoc):
-
-        command_name = 'build_sphinx'
-        builders = ['html', 'man']
-
-        def _get_source_dir(self):
-            option_dict = self.distribution.get_option_dict('build_sphinx')
-            if 'source_dir' in option_dict:
-                source_dir = os.path.join(option_dict['source_dir'][1], 'api')
-            else:
-                source_dir = 'doc/source/api'
-            if not os.path.exists(source_dir):
-                os.makedirs(source_dir)
-            return source_dir
-
-        def generate_autoindex(self):
-            log.info("[pbr] Autodocumenting from %s"
-                     % os.path.abspath(os.curdir))
-            modules = {}
-            source_dir = self._get_source_dir()
-            for pkg in self.distribution.packages:
-                if '.' not in pkg:
-                    for dirpath, dirnames, files in os.walk(pkg):
-                        _find_modules(modules, dirpath, files)
-            module_list = list(modules.keys())
-            module_list.sort()
-            autoindex_filename = os.path.join(source_dir, 'autoindex.rst')
-            with open(autoindex_filename, 'w') as autoindex:
-                autoindex.write(""".. toctree::
-   :maxdepth: 1
-
-""")
-                for module in module_list:
-                    output_filename = os.path.join(source_dir,
-                                                   "%s.rst" % module)
-                    heading = "The :mod:`%s` Module" % module
-                    underline = "=" * len(heading)
-                    values = dict(module=module, heading=heading,
-                                  underline=underline)
-
-                    log.info("[pbr] Generating %s"
-                             % output_filename)
-                    with open(output_filename, 'w') as output_file:
-                        output_file.write(_rst_template % values)
-                    autoindex.write("   %s.rst\n" % module)
-
-        def _sphinx_tree(self):
-                source_dir = self._get_source_dir()
-                apidoc.main(['apidoc', '.', '-H', 'Modules', '-o', source_dir])
-
-        def _sphinx_run(self):
-            if not self.verbose:
-                status_stream = cStringIO.StringIO()
-            else:
-                status_stream = sys.stdout
-            confoverrides = {}
-            if self.version:
-                confoverrides['version'] = self.version
-            if self.release:
-                confoverrides['release'] = self.release
-            if self.today:
-                confoverrides['today'] = self.today
-            sphinx_config = config.Config(self.config_dir, 'conf.py', {}, [])
-            sphinx_config.init_values()
-            if self.builder == 'man' and len(sphinx_config.man_pages) == 0:
-                return
-            app = application.Sphinx(
-                self.source_dir, self.config_dir,
-                self.builder_target_dir, self.doctree_dir,
-                self.builder, confoverrides, status_stream,
-                freshenv=self.fresh_env, warningiserror=True)
-
-            try:
-                app.build(force_all=self.all_files)
-            except Exception as err:
-                from docutils import utils
-                if isinstance(err, utils.SystemMessage):
-                    sys.stder.write('reST markup error:\n')
-                    sys.stderr.write(err.args[0].encode('ascii',
-                                                        'backslashreplace'))
-                    sys.stderr.write('\n')
-                else:
-                    raise
-
-            if self.link_index:
-                src = app.config.master_doc + app.builder.out_suffix
-                dst = app.builder.get_outfilename('index')
-                os.symlink(src, dst)
-
-        def run(self):
-            option_dict = self.distribution.get_option_dict('pbr')
-            tree_index = get_boolean_option(option_dict,
-                                            'autodoc_tree_index_modules',
-                                            'AUTODOC_TREE_INDEX_MODULES')
-            auto_index = get_boolean_option(option_dict,
-                                            'autodoc_index_modules',
-                                            'AUTODOC_INDEX_MODULES')
-            if not os.getenv('SPHINX_DEBUG'):
-                #NOTE(afazekas): These options can be used together,
-                # but they do a very similar thing in a difffernet way
-                if tree_index:
-                    self._sphinx_tree()
-                if auto_index:
-                    self.generate_autoindex()
-
-            for builder in self.builders:
-                self.builder = builder
-                self.finalize_options()
-                self.project = self.distribution.get_name()
-                self.version = self.distribution.get_version()
-                self.release = self.distribution.get_version()
-                if 'warnerrors' in option_dict:
-                    self._sphinx_run()
-                else:
-                    setup_command.BuildDoc.run(self)
-
-        def finalize_options(self):
-            # Not a new style class, super keyword does not work.
-            setup_command.BuildDoc.finalize_options(self)
-            # Allow builders to be configurable - as a comma separated list.
-            if not isinstance(self.builders, list) and self.builders:
-                self.builders = self.builders.split(',')
-
-    class LocalBuildLatex(LocalBuildDoc):
-        builders = ['latex']
-        command_name = 'build_sphinx_latex'
-
+    from pbr import builddoc
     _have_sphinx = True
-
+    # Import the symbols from their new home so the package API stays
+    # compatible.
+    LocalBuildDoc = builddoc.LocalBuildDoc
+    LocalBuildLatex = builddoc.LocalBuildLatex
 except ImportError:
     _have_sphinx = False
+    LocalBuildDoc = None
+    LocalBuildLatex = None
 
 
 def have_sphinx():
@@ -777,18 +448,18 @@ def have_sphinx():
 
 
 def _get_revno(git_dir):
-    """Return the number of commits since the most recent tag.
+    """Return the commit count since the most recent tag.
 
     We use git-describe to find this out, but if there are no
     tags then we fall back to counting commits since the beginning
     of time.
     """
-    describe = _run_git_command(['describe', '--always'], git_dir)
-    if "-" in describe:
-        return describe.rsplit("-", 2)[-2]
+    raw_tag_info = git._get_raw_tag_info(git_dir)
+    if raw_tag_info:
+        return raw_tag_info
 
     # no tags found
-    revlist = _run_git_command(
+    revlist = git._run_git_command(
         ['rev-list', '--abbrev-commit', 'HEAD'], git_dir)
     return len(revlist.splitlines())
 
@@ -799,20 +470,33 @@ def _get_version_from_git(pre_version):
     if the current revision has no tag.
     """
 
-    git_dir = _get_git_directory()
-    if git_dir and _git_is_installed():
+    git_dir = git._run_git_functions()
+    if git_dir:
         if pre_version:
             try:
-                return _run_git_command(
+                return git._run_git_command(
                     ['describe', '--exact-match'], git_dir,
                     throw_on_error=True).replace('-', '.')
             except Exception:
-                sha = _run_git_command(
-                    ['log', '-n1', '--pretty=format:%h'], git_dir)
-                return "%s.dev%s.g%s" % (pre_version, _get_revno(git_dir), sha)
+                return "%s.dev%s" % (pre_version, _get_revno(git_dir))
         else:
-            return _run_git_command(
-                ['describe', '--always'], git_dir).replace('-', '.')
+            # git describe always is going to return one of three things
+            # - a short-sha if there are no tags
+            # - a tag, if there's one on the current revision
+            # - a string of the form $last_tag-$revs_since_last_tag-g$short_sha
+            raw_version = git._run_git_command(['describe', '--always'],
+                                               git_dir)
+            # First, if there are no -'s or .'s, then it's just a short sha.
+            # Create a synthetic version for it.
+            if '-' not in raw_version and '.' not in raw_version:
+                return "0.0.0.post%s" % _get_revno(git_dir)
+            # Now, we want to strip the short-sha prefix
+            stripped_version = raw_version.split('-g')[0]
+            # Finally, if we convert - to .post, which will turn the remaining
+            # - which separates the version from the revcount into a PEP440
+            # post string
+            return stripped_version.replace('-', '.post')
+
     # If we don't know the version, return an empty string so at least
     # the downstream users of the value always have the same type of
     # object to work with.
@@ -870,3 +554,10 @@ def get_version(package_name, pre_version=None):
     raise Exception("Versioning for this project requires either an sdist"
                     " tarball, or access to an upstream git repository."
                     " Are you sure that git is installed?")
+
+
+# This is added because pbr uses pbr to install itself. That means that
+# any changes to the egg info writer entrypoints must be forward and
+# backward compatible. This maintains the pbr.packaging.write_pbr_json
+# path.
+write_pbr_json = pbr.pbr_json.write_pbr_json
