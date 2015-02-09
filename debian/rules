@@ -23,11 +23,13 @@ override_dh_auto_install:
 		python$$pyvers setup.py install --install-layout=deb \
 			--root $(CURDIR)/debian/python-pbr; \
 	done
+	mv $(CURDIR)/debian/python-pbr/usr/bin/pbr $(CURDIR)/debian/python-pbr/usr/bin/python2-pbr
 	set -e && for pyvers in $(PYTHON3S); do \
 		python$$pyvers setup.py install --install-layout=deb \
 			--root $(CURDIR)/debian/python3-pbr; \
 		rm -rf $(CURDIR)/debian/python3-pbr/usr/lib/python3/dist-packages/pbr/tests ; \
 	done
+	mv $(CURDIR)/debian/python3-pbr/usr/bin/pbr $(CURDIR)/debian/python3-pbr/usr/bin/python3-pbr
 
 override_dh_auto_test:
 ifeq (,$(findstring nocheck, $(DEB_BUILD_OPTIONS)))

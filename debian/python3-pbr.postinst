@@ -1,0 +1,12 @@
+#!/bin/sh
+
+set -e
+
+if [ "$1" = "configure" ] ; then
+	update-alternatives --install /usr/bin/pbr pbr /usr/bin/python3-pbr 200
+fi
+
+#DEBHELPER#
+
+exit 0
+
