@@ -51,8 +51,7 @@ Homepage: http://pypi.python.org/pypi/pbr
 Package: python-pbr
 Architecture: all
 Pre-Depends: dpkg (>= 1.15.6~)
-Depends: python-pip (>= 1.4),
-         python-six (>= 1.5.2),
+Depends: python-six (>= 1.5.2),
          ${misc:Depends},
          ${python:Depends}
 Recommends: ${python:Recommends}
@@ -82,8 +81,7 @@ Description: inject useful and sensible default behaviors into setuptools - Pyth
 Package: python3-pbr
 Architecture: all
 Pre-Depends: dpkg (>= 1.15.6~)
-Depends: python3-pip (>= 1.4),
-         python3-six (>= 1.5.2),
+Depends: python3-six (>= 1.5.2),
          ${misc:Depends},
          ${python3:Depends}
 Recommends: ${python3:Recommends}
