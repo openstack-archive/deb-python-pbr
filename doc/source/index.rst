@@ -10,6 +10,11 @@ the results in as the arguments to a call to `setup.py` - so the heavy
 lifting of handling python packaging needs is still being done by
 `setuptools`.
 
+Note that we don't support the `easy_install` aspects of setuptools: while
+we depend on setup_requires, for any install_requires we recommend that they
+be installed prior to running `setup.py install` - either by hand, or by using
+an install tool such as `pip`.
+
 What It Does
 ============
 
@@ -26,11 +31,37 @@ PBR can and does do a bunch of things for you:
 Version
 -------
 
-Version strings will be inferred from git. If a given revision is tagged,
-that's the version. If it's not, and you don't provide a version, the version
-will be very similar to git describe. If you do, then we'll assume that's the
-version you are working towards, and will generate alpha version strings
-based on commits since last tag and the current git sha.
+Versions can be managed two ways - postversioning and preversioning.
+Postversioning is the default, and preversioning is enabeld by setting
+``version`` in the setup.cfg ``metadata`` section. In both cases
+version strings are inferred from git.
+
+If a given revision is tagged, that's the version.
+
+If it's not, then we take the last tagged version number and increment it to
+get a minimum target version.
+
+We then walk git history back to the last release. Within each commit we look
+for a Sem-Ver: pseudo header, and if found parse it looking for keywords.
+Unknown symbols are not an error (so that folk can't wedge pbr or break their
+tree), but we will emit an info level warning message.  Known symbols:
+``feature``, ``api-break``, ``deprecation``, ``bugfix``. A missing
+Sem-Ver line is equivalent to ``Sem-Ver: bugfix``. The ``bugfix`` symbol causes
+a patch level increment to the version. The ``feature`` and ``deprecation``
+symbols cause a minor version increment. The ``api-break`` symbol causes a
+major version increment.
+
+If postversioning is in use, we use the resulting version number as the target
+version.
+
+If preversioning is in use - that is if there is a version set in setup.cfg
+metadata - then we check that that version is higher than the target version
+we inferred above. If it is not, we raise an error, otherwise we use the
+version from setup.cfg as the target.
+
+We then generate dev version strings based on the commits since the last
+release and include the current git sha to disambiguate multiple dev versions
+with the same number of commits since the release.
 
 .. note::
 
@@ -38,6 +69,11 @@ based on commits since last tag and the current git sha.
    calculate version.
 
 The versions are expected to be compliant with :doc:`semver`.
+
+The ``version.SemanticVersion`` class can be used to query versions of a
+package and present it in various forms - ``debian_version()``,
+``release_string()``, ``rpm_string()``, ``version_string()``, or
+``version_tuple()``.
 
 AUTHORS and ChangeLog
 ---------------------
@@ -86,6 +122,45 @@ version number used to install the package):
 
 Only the first file found is used to install the list of packages it
 contains.
+
+Extra requirements
+------------------
+
+Groups of optional dependencies (`"extra" requirements
+<https://www.python.org/dev/peps/pep-0426/#extras-optional-dependencies>`_)
+can be described in your setup.cfg, rather than needing to be added to
+setup.py. An example (which also demonstrates the use of environment
+markers) is shown below.
+
+Environment markers
+-------------------
+
+Environment markers are `conditional dependencies
+<https://www.python.org/dev/peps/pep-0426/#environment-markers>`_
+which can be added to the requirements (or to a group of extra
+requirements) automatically, depending on the environment the
+installer is running in. They can be added to requirements in the
+requirements file, or to extras definied in setup.cfg - but the format
+is slightly different for each.
+
+For ``requirements.txt``::
+
+    argparse; python=='2.6'
+
+will result in the package depending on ``argparse`` only if it's being
+installed into python2.6
+
+For extras specifed in setup.cfg, add an ``extras`` section. For
+instance, to create two groups of extra requirements with additional
+constraints on the environment, you can use::
+
+    [extras]
+    security =
+        aleph
+        bet :python_environment=='3.2'
+        gimel :python_environment=='2.7'
+    testing =
+        quux :python_environment=='2.7'
 
 long_description
 ----------------
@@ -221,6 +296,7 @@ Additional Docs
 
    packagers
    semver
+   testing
 
 Indices and tables
 ==================

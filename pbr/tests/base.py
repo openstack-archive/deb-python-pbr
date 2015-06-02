@@ -1,5 +1,3 @@
-# vim: tabstop=4 shiftwidth=4 softtabstop=4
-
 # Copyright 2010-2011 OpenStack Foundation
 # Copyright (c) 2013 Hewlett-Packard Development Company, L.P.
 #
@@ -98,6 +96,9 @@ class BaseTestCase(testtools.TestCase, testresources.ResourcedTestCase):
         self.useFixture(fixtures.TempHomeDir())
         self.useFixture(fixtures.NestedTempfile())
         self.useFixture(fixtures.FakeLogger())
+        # TODO(lifeless) we should remove PBR_VERSION from the environment.
+        # rather than setting it, because thats not representative - we need to
+        # test non-preversioned codepaths too!
         self.useFixture(fixtures.EnvironmentVariable('PBR_VERSION', '0.0'))
 
         self.temp_dir = self.useFixture(fixtures.TempDir()).path
@@ -107,6 +108,16 @@ class BaseTestCase(testtools.TestCase, testresources.ResourcedTestCase):
         self.addCleanup(os.chdir, os.getcwd())
         os.chdir(self.package_dir)
         self.addCleanup(self._discard_testpackage)
+        # Tests can opt into non-PBR_VERSION by setting preversioned=False as
+        # an attribute.
+        if not getattr(self, 'preversioned', True):
+            self.useFixture(fixtures.EnvironmentVariable('PBR_VERSION'))
+            setup_cfg_path = os.path.join(self.package_dir, 'setup.cfg')
+            with open(setup_cfg_path, 'rt') as cfg:
+                content = cfg.read()
+            content = content.replace(u'version = 0.1.dev', u'')
+            with open(setup_cfg_path, 'wt') as cfg:
+                cfg.write(content)
 
     def _discard_testpackage(self):
         # Remove pbr.testpackage from sys.modules so that it can be freshly
@@ -144,8 +155,21 @@ def _run_cmd(args, cwd):
     :return: ((stdout, stderr), returncode)
     """
     p = subprocess.Popen(
-        args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd)
+        args, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE, cwd=cwd)
     streams = tuple(s.decode('latin1').strip() for s in p.communicate())
     for content in streams:
         print(content)
     return (streams) + (p.returncode,)
+
+
+def _config_git():
+    _run_cmd(
+        ['git', 'config', '--global', 'user.email', 'example@example.com'],
+        None)
+    _run_cmd(
+        ['git', 'config', '--global', 'user.name', 'OpenStack Developer'],
+        None)
+    _run_cmd(
+        ['git', 'config', '--global', 'user.signingkey',
+         'example@example.com'], None)

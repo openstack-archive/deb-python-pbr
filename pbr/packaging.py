@@ -1,5 +1,3 @@
-# vim: tabstop=4 shiftwidth=4 softtabstop=4
-
 # Copyright 2011 OpenStack LLC.
 # Copyright 2012-2013 Hewlett-Packard Development Company, L.P.
 # All Rights Reserved.
@@ -22,14 +20,15 @@ Utilities with minimum-depends for use in setup.py
 
 from __future__ import unicode_literals
 
+from distutils.command import install as du_install
+from distutils import log
 import email
 import os
 import re
 import sys
 
-from distutils.command import install as du_install
-from distutils import log
 import pkg_resources
+from setuptools.command import develop
 from setuptools.command import easy_install
 from setuptools.command import egg_info
 from setuptools.command import install
@@ -40,6 +39,7 @@ from pbr import extra_files
 from pbr import git
 from pbr import options
 import pbr.pbr_json
+from pbr import version
 
 REQUIREMENTS_FILES = ('requirements.txt', 'tools/pip-requires')
 TEST_REQUIREMENTS_FILES = ('test-requirements.txt', 'tools/test-requires')
@@ -66,23 +66,6 @@ def append_text_list(config, key, text_list):
         new_value.append(current_value)
     new_value.extend(text_list)
     config[key] = '\n'.join(new_value)
-
-
-def _pip_install(links, requires, root=None, option_dict=dict()):
-    if options.get_boolean_option(
-            option_dict, 'skip_pip_install', 'SKIP_PIP_INSTALL'):
-        return
-    cmd = [sys.executable, '-m', 'pip.__init__', 'install']
-    if root:
-        cmd.append("--root=%s" % root)
-    for link in links:
-        cmd.append("-f")
-        cmd.append(link)
-
-    # NOTE(ociuhandu): popen on Windows does not accept unicode strings
-    git._run_shell_command(
-        cmd + requires,
-        throw_on_error=True, buffer=False, env=dict(PIP_USE_WHEEL=b"true"))
 
 
 def _any_existing(file_list):
@@ -179,83 +162,23 @@ class LocalInstall(install.install):
     Force a non-egg installed in the manner of
     single-version-externally-managed, which allows us to install manpages
     and config files.
-
-    Because non-egg installs bypass the depend processing machinery, we
-    need to do our own. Because easy_install is evil, just use pip to
-    process our requirements files directly, which means we don't have to
-    do crazy extra processing.
-
-    Bypass installation if --single-version-externally-managed is given,
-    so that behavior for packagers remains the same.
     """
 
     command_name = 'install'
 
     def run(self):
-        option_dict = self.distribution.get_option_dict('pbr')
-        if (not self.single_version_externally_managed
-                and self.distribution.install_requires):
-            _pip_install(
-                self.distribution.dependency_links,
-                self.distribution.install_requires, self.root,
-                option_dict=option_dict)
-
         return du_install.install.run(self)
 
-
-def _newer_requires_files(egg_info_dir):
-    """Check to see if any of the requires files are newer than egg-info."""
-    for target, sources in (('requires.txt', get_requirements_files()),
-                            ('test-requires.txt', TEST_REQUIREMENTS_FILES)):
-        target_path = os.path.join(egg_info_dir, target)
-        for src in _any_existing(sources):
-            if (not os.path.exists(target_path) or
-                    os.path.getmtime(target_path)
-                    < os.path.getmtime(src)):
-                return True
-    return False
-
-
-def _copy_test_requires_to(egg_info_dir):
-    """Copy the requirements file to egg-info/test-requires.txt."""
-    with open(os.path.join(egg_info_dir, 'test-requires.txt'), 'w') as dest:
-        for source in _any_existing(TEST_REQUIREMENTS_FILES):
-            dest.write(open(source, 'r').read().rstrip('\n') + '\n')
-
-
-class _PipInstallTestRequires(object):
-    """Mixin class to install test-requirements.txt before running tests."""
-
-    def install_test_requirements(self):
-
-        links = parse_dependency_links(TEST_REQUIREMENTS_FILES)
-        if self.distribution.tests_require:
-            option_dict = self.distribution.get_option_dict('pbr')
-            _pip_install(
-                links, self.distribution.tests_require,
-                option_dict=option_dict)
-
-    def pre_run(self):
-        self.egg_name = pkg_resources.safe_name(self.distribution.get_name())
-        self.egg_info = "%s.egg-info" % pkg_resources.to_filename(
-            self.egg_name)
-        if (not os.path.exists(self.egg_info) or
-                _newer_requires_files(self.egg_info)):
-            ei_cmd = self.get_finalized_command('egg_info')
-            ei_cmd.run()
-            self.install_test_requirements()
-            _copy_test_requires_to(self.egg_info)
 
 try:
     from pbr import testr_command
 
-    class TestrTest(testr_command.Testr, _PipInstallTestRequires):
+    class TestrTest(testr_command.Testr):
         """Make setup.py test do the right thing."""
 
         command_name = 'test'
 
         def run(self):
-            self.pre_run()
             # Can't use super - base class old-style class
             testr_command.Testr.run(self)
 
@@ -271,13 +194,12 @@ def have_testr():
 try:
     from nose import commands
 
-    class NoseTest(commands.nosetests, _PipInstallTestRequires):
+    class NoseTest(commands.nosetests):
         """Fallback test runner if testr is a no-go."""
 
         command_name = 'test'
 
         def run(self):
-            self.pre_run()
             # Can't use super - base class old-style class
             commands.nosetests.run(self)
 
@@ -321,16 +243,23 @@ def override_get_script_args(
             yield (name, header + script_text)
 
 
+class LocalDevelop(develop.develop):
+
+    command_name = 'develop'
+
+    def install_wrapper_scripts(self, dist):
+        if sys.platform == 'win32':
+            return develop.develop.install_wrapper_scripts(self, dist)
+        if not self.exclude_scripts:
+            for args in override_get_script_args(dist):
+                self.write_script(*args)
+
+
 class LocalInstallScripts(install_scripts.install_scripts):
     """Intercepts console scripts entry_points."""
     command_name = 'install_scripts'
 
     def run(self):
-        if os.name != 'nt':
-            get_script_args = override_get_script_args
-        else:
-            get_script_args = easy_install.get_script_args
-
         import distutils.command.install_scripts
 
         self.run_command("egg_info")
@@ -355,6 +284,13 @@ class LocalInstallScripts(install_scripts.install_scripts):
         is_wininst = getattr(
             self.get_finalized_command("bdist_wininst"), '_is_running', False
         )
+
+        if os.name != 'nt':
+            get_script_args = override_get_script_args
+        else:
+            get_script_args = easy_install.get_script_args
+            executable = '"%s"' % executable
+
         for args in get_script_args(dist, executable, is_wininst):
             self.write_script(*args)
 
@@ -403,9 +339,13 @@ class LocalEggInfo(egg_info.egg_info):
         If we are in an sdist command, then we always want to update
         SOURCES.txt. If we are not in an sdist command, then it doesn't
         matter one flip, and is actually destructive.
+        However, if we're in a git context, it's always the right thing to do
+        to recreate SOURCES.txt
         """
         manifest_filename = os.path.join(self.egg_info, "SOURCES.txt")
-        if not os.path.exists(manifest_filename) or 'sdist' in sys.argv:
+        if (not os.path.exists(manifest_filename) or
+                os.path.exists('.git') or
+                'sdist' in sys.argv):
             log.info("[pbr] Processing SOURCES.txt")
             mm = LocalManifestMaker(self.distribution)
             mm.manifest = manifest_filename
@@ -425,7 +365,10 @@ class LocalSDist(sdist.sdist):
 
     def run(self):
         option_dict = self.distribution.get_option_dict('pbr')
-        git.write_git_changelog(option_dict=option_dict)
+        changelog = git._iter_log_oneline(option_dict=option_dict)
+        if changelog:
+            changelog = git._iter_changelog(changelog)
+        git.write_git_changelog(option_dict=option_dict, changelog=changelog)
         git.generate_authors(option_dict=option_dict)
         # sdist.sdist is an old style class, can't use super()
         sdist.sdist.run(self)
@@ -447,56 +390,130 @@ def have_sphinx():
     return _have_sphinx
 
 
-def _get_revno(git_dir):
-    """Return the commit count since the most recent tag.
+def _get_increment_kwargs(git_dir, tag):
+    """Calculate the sort of semver increment needed from git history.
+
+    Every commit from HEAD to tag is consider for Sem-Ver metadata lines.
+    See the pbr docs for their syntax.
+
+    :return: a dict of kwargs for passing into SemanticVersion.increment.
+    """
+    result = {}
+    if tag:
+        version_spec = tag + "..HEAD"
+    else:
+        version_spec = "HEAD"
+    changelog = git._run_git_command(['log', version_spec], git_dir)
+    header_len = len('    sem-ver:')
+    commands = [line[header_len:].strip() for line in changelog.split('\n')
+                if line.lower().startswith('    sem-ver:')]
+    symbols = set()
+    for command in commands:
+        symbols.update([symbol.strip() for symbol in command.split(',')])
+
+    def _handle_symbol(symbol, symbols, impact):
+        if symbol in symbols:
+            result[impact] = True
+            symbols.discard(symbol)
+    _handle_symbol('bugfix', symbols, 'patch')
+    _handle_symbol('feature', symbols, 'minor')
+    _handle_symbol('deprecation', symbols, 'minor')
+    _handle_symbol('api-break', symbols, 'major')
+    for symbol in symbols:
+        log.info('[pbr] Unknown Sem-Ver symbol %r' % symbol)
+    # We don't want patch in the kwargs since it is not a keyword argument -
+    # its the default minimum increment.
+    result.pop('patch', None)
+    return result
+
+
+def _get_revno_and_last_tag(git_dir):
+    """Return the commit data about the most recent tag.
 
     We use git-describe to find this out, but if there are no
     tags then we fall back to counting commits since the beginning
     of time.
     """
-    raw_tag_info = git._get_raw_tag_info(git_dir)
-    if raw_tag_info:
-        return raw_tag_info
+    changelog = git._iter_log_oneline(git_dir=git_dir)
+    row_count = 0
+    for row_count, (ignored, tag_set, ignored) in enumerate(changelog):
+        version_tags = set()
+        for tag in list(tag_set):
+            try:
+                version_tags.add(version.SemanticVersion.from_pip_string(tag))
+            except Exception:
+                pass
+        if version_tags:
+            return max(version_tags).release_string(), row_count
+    return "", row_count
 
-    # no tags found
-    revlist = git._run_git_command(
-        ['rev-list', '--abbrev-commit', 'HEAD'], git_dir)
-    return len(revlist.splitlines())
 
+def _get_version_from_git_target(git_dir, target_version):
+    """Calculate a version from a target version in git_dir.
 
-def _get_version_from_git(pre_version):
-    """Return a version which is equal to the tag that's on the current
-    revision if there is one, or tag plus number of additional revisions
-    if the current revision has no tag.
+    This is used for untagged versions only. A new version is calculated as
+    necessary based on git metadata - distance to tags, current hash, contents
+    of commit messages.
+
+    :param git_dir: The git directory we're working from.
+    :param target_version: If None, the last tagged version (or 0 if there are
+        no tags yet) is incremented as needed to produce an appropriate target
+        version following semver rules. Otherwise target_version is used as a
+        constraint - if semver rules would result in a newer version then an
+        exception is raised.
+    :return: A semver version object.
     """
+    tag, distance = _get_revno_and_last_tag(git_dir)
+    last_semver = version.SemanticVersion.from_pip_string(tag or '0')
+    if distance == 0:
+        new_version = last_semver
+    else:
+        new_version = last_semver.increment(
+            **_get_increment_kwargs(git_dir, tag))
+    if target_version is not None and new_version > target_version:
+        raise ValueError(
+            "git history requires a target version of %(new)s, but target "
+            "version is %(target)s" %
+            dict(new=new_version, target=target_version))
+    if distance == 0:
+        return last_semver
+    new_dev = new_version.to_dev(distance)
+    if target_version is not None:
+        target_dev = target_version.to_dev(distance)
+        if target_dev > new_dev:
+            return target_dev
+    return new_dev
 
+
+def _get_version_from_git(pre_version=None):
+    """Calculate a version string from git.
+
+    If the revision is tagged, return that. Otherwise calculate a semantic
+    version description of the tree.
+
+    The number of revisions since the last tag is included in the dev counter
+    in the version for untagged versions.
+
+    :param pre_version: If supplied use this as the target version rather than
+        inferring one from the last tag + commit messages.
+    """
     git_dir = git._run_git_functions()
     if git_dir:
-        if pre_version:
-            try:
-                return git._run_git_command(
-                    ['describe', '--exact-match'], git_dir,
-                    throw_on_error=True).replace('-', '.')
-            except Exception:
-                return "%s.dev%s" % (pre_version, _get_revno(git_dir))
-        else:
-            # git describe always is going to return one of three things
-            # - a short-sha if there are no tags
-            # - a tag, if there's one on the current revision
-            # - a string of the form $last_tag-$revs_since_last_tag-g$short_sha
-            raw_version = git._run_git_command(['describe', '--always'],
-                                               git_dir)
-            # First, if there are no -'s or .'s, then it's just a short sha.
-            # Create a synthetic version for it.
-            if '-' not in raw_version and '.' not in raw_version:
-                return "0.0.0.post%s" % _get_revno(git_dir)
-            # Now, we want to strip the short-sha prefix
-            stripped_version = raw_version.split('-g')[0]
-            # Finally, if we convert - to .post, which will turn the remaining
-            # - which separates the version from the revcount into a PEP440
-            # post string
-            return stripped_version.replace('-', '.post')
-
+        try:
+            tagged = git._run_git_command(
+                ['describe', '--exact-match'], git_dir,
+                throw_on_error=True).replace('-', '.')
+            target_version = version.SemanticVersion.from_pip_string(tagged)
+        except Exception:
+            if pre_version:
+                # not released yet - use pre_version as the target
+                target_version = version.SemanticVersion.from_pip_string(
+                    pre_version)
+            else:
+                # not released yet - just calculate from git history
+                target_version = None
+        result = _get_version_from_git_target(git_dir, target_version)
+        return result.release_string()
     # If we don't know the version, return an empty string so at least
     # the downstream users of the value always have the same type of
     # object to work with.
@@ -506,40 +523,51 @@ def _get_version_from_git(pre_version):
         return ''
 
 
-def _get_version_from_pkg_info(package_name):
-    """Get the version from PKG-INFO file if we can."""
-    try:
-        pkg_info_file = open('PKG-INFO', 'r')
-    except (IOError, OSError):
-        return None
-    try:
-        pkg_info = email.message_from_file(pkg_info_file)
-    except email.MessageError:
-        return None
+def _get_version_from_pkg_metadata(package_name):
+    """Get the version from package metadata if present.
+
+    This looks for PKG-INFO if present (for sdists), and if not looks
+    for METADATA (for wheels) and failing that will return None.
+    """
+    pkg_metadata_filenames = ['PKG-INFO', 'METADATA']
+    pkg_metadata = {}
+    for filename in pkg_metadata_filenames:
+        try:
+            pkg_metadata_file = open(filename, 'r')
+        except (IOError, OSError):
+            continue
+        try:
+            pkg_metadata = email.message_from_file(pkg_metadata_file)
+        except email.MessageError:
+            continue
+
     # Check to make sure we're in our own dir
-    if pkg_info.get('Name', None) != package_name:
+    if pkg_metadata.get('Name', None) != package_name:
         return None
-    return pkg_info.get('Version', None)
+    return pkg_metadata.get('Version', None)
 
 
 def get_version(package_name, pre_version=None):
-    """Get the version of the project. First, try getting it from PKG-INFO, if
-    it exists. If it does, that means we're in a distribution tarball or that
-    install has happened. Otherwise, if there is no PKG-INFO file, pull the
-    version from git.
+    """Get the version of the project. First, try getting it from PKG-INFO or
+    METADATA, if it exists. If it does, that means we're in a distribution
+    tarball or that install has happened. Otherwise, if there is no PKG-INFO
+    or METADATA file, pull the version from git.
 
     We do not support setup.py version sanity in git archive tarballs, nor do
     we support packagers directly sucking our git repo into theirs. We expect
     that a source tarball be made from our git repo - or that if someone wants
     to make a source tarball from a fork of our repo with additional tags in it
     that they understand and desire the results of doing that.
+
+    :param pre_version: The version field from setup.cfg - if set then this
+        version will be the next release.
     """
     version = os.environ.get(
         "PBR_VERSION",
         os.environ.get("OSLO_PACKAGE_VERSION", None))
     if version:
         return version
-    version = _get_version_from_pkg_info(package_name)
+    version = _get_version_from_pkg_metadata(package_name)
     if version:
         return version
     version = _get_version_from_git(pre_version)
