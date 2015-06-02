@@ -46,7 +46,7 @@ Build-Depends: debhelper (>= 9),
                testrepository (>= 0.0.18),
 Build-Conflicts: python-pbr,
                  python3-pbr,
-Standards-Version: 3.9.5
+Standards-Version: 3.9.6
 Vcs-Browser: http://anonscm.debian.org/gitweb/?p=openstack/python-pbr.git
 Vcs-Git: git://anonscm.debian.org/openstack/python-pbr.git
 Homepage: http://pypi.python.org/pypi/pbr
