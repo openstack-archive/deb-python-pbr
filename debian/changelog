@@ -1,8 +1,9 @@
-python-pbr (0.10.7-1) UNRELEASED; urgency=medium
+python-pbr (1.0.1-1) UNRELEASED; urgency=medium
 
-  * New upstream release.
+  * New upstream release:
+    - d/control: Align version requirements with upstream.
 
- -- Thomas Goirand <zigo@debian.org>  Mon, 09 Feb 2015 16:43:19 +0100
+ -- James Page <james.page@ubuntu.com>  Tue, 02 Jun 2015 09:34:24 +0100
 
 python-pbr (0.10.0-1) experimental; urgency=medium
 
