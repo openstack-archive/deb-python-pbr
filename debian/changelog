@@ -2,6 +2,7 @@ python-pbr (1.0.1-1) UNRELEASED; urgency=medium
 
   * New upstream release:
     - d/control: Align version requirements with upstream.
+    - d/p/no-intersphinx.patch: Dropped, now upstream.
 
  -- James Page <james.page@ubuntu.com>  Tue, 02 Jun 2015 09:34:24 +0100
 

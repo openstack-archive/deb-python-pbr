@@ -4,9 +4,9 @@ Author: Thomas Goirand <zigo@debian.org>
 Forwarded: not-needed
 Last-Update: 2014-04-11
 
---- python-pbr-0.8.2.orig/pbr/tests/test_setup.py
-+++ python-pbr-0.8.2/pbr/tests/test_setup.py
-@@ -21,6 +21,7 @@ from __future__ import print_function
+--- a/pbr/tests/test_setup.py
++++ b/pbr/tests/test_setup.py
+@@ -19,6 +19,7 @@ from __future__ import print_function
  import os
  import sys
  import tempfile
