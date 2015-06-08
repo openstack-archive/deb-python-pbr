@@ -1,0 +1,17 @@
+#!/bin/bash
+
+set -e
+
+PYTHONS=$(pyversions -vr)
+PYTHON3S=$(py3versions -vr)
+
+for i in ${PYTHONS} ${PYTHON3S}; do
+  echo "===> Testing with Python $i"
+  rm -rf .testrepository
+  testr init
+  TEMP_REZ=`mktemp -t`
+  PYTHON=python$i PYTHONPATH=`pwd` testr run --subunit 'tests\.(?!.*TestCore.test_console_script.*)' | tee $TEMP_REZ | subunit2pyunit
+  cat $TEMP_REZ | subunit-filter -s --no-passthrough | subunit-stats
+  rm -f $TEMP_REZ
+  testr slowest
+done

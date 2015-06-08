@@ -1,0 +1,3 @@
+Tests: unit
+Depends: python-pip, python3-pip, python-virtualenv, python3-virtualenv, @builddeps@, @
+Restrictions: allow-stderr

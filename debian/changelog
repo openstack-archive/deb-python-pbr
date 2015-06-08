@@ -1,3 +1,14 @@
+python-pbr (1.0.1-2) UNRELEASED; urgency=medium
+
+  * Team upload.
+  * Add autopkgtest from Ubuntu:
+    - d/tests/*: Enable and execute unit tests for autopkgtest.
+    - d/rules: Skip unit tests during package build if Ubuntu or
+      derivative.
+    - d/control: Add XS-Testsuite: autopkgtest.
+
+ -- James Page <james.page@ubuntu.com>  Mon, 08 Jun 2015 10:51:10 +0100
+
 python-pbr (1.0.1-1) experimental; urgency=medium
 
   * Team upload.

@@ -51,6 +51,7 @@ Standards-Version: 3.9.6
 Vcs-Browser: http://anonscm.debian.org/gitweb/?p=openstack/python-pbr.git
 Vcs-Git: git://anonscm.debian.org/openstack/python-pbr.git
 Homepage: http://pypi.python.org/pypi/pbr
+XS-Testsuite: autopkgtest
 
 Package: python-pbr
 Architecture: all
