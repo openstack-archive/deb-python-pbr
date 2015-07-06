@@ -39,6 +39,7 @@ from pbr import extra_files
 from pbr import git
 from pbr import options
 import pbr.pbr_json
+from pbr import testr_command
 from pbr import version
 
 REQUIREMENTS_FILES = ('requirements.txt', 'tools/pip-requires')
@@ -80,7 +81,7 @@ def get_reqs_from_files(requirements_files):
     return []
 
 
-def parse_requirements(requirements_files=None):
+def parse_requirements(requirements_files=None, strip_markers=False):
 
     if requirements_files is None:
         requirements_files = get_requirements_files()
@@ -103,7 +104,8 @@ def parse_requirements(requirements_files=None):
         # -r other-requirements.txt
         if line.startswith('-r'):
             req_file = line.partition(' ')[2]
-            requirements += parse_requirements([req_file])
+            requirements += parse_requirements(
+                [req_file], strip_markers=strip_markers)
             continue
 
         try:
@@ -129,6 +131,11 @@ def parse_requirements(requirements_files=None):
             reason = 'Index Location'
 
         if line is not None:
+            if strip_markers:
+                semi_pos = line.find(';')
+                if semi_pos < 0:
+                    semi_pos = None
+                line = line[:semi_pos]
             requirements.append(line)
         else:
             log.info(
@@ -170,26 +177,19 @@ class LocalInstall(install.install):
         return du_install.install.run(self)
 
 
-try:
-    from pbr import testr_command
+class TestrTest(testr_command.Testr):
+    """Make setup.py test do the right thing."""
 
-    class TestrTest(testr_command.Testr):
-        """Make setup.py test do the right thing."""
+    command_name = 'test'
 
-        command_name = 'test'
-
-        def run(self):
-            # Can't use super - base class old-style class
-            testr_command.Testr.run(self)
-
-    _have_testr = True
-
-except ImportError:
-    _have_testr = False
+    def run(self):
+        # Can't use super - base class old-style class
+        testr_command.Testr.run(self)
 
 
 def have_testr():
-    return _have_testr
+    return testr_command.have_testr
+
 
 try:
     from nose import commands

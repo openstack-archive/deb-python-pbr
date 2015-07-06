@@ -184,6 +184,7 @@ A simple sample can be found in pbr's own setup.cfg
  author-email = openstack-dev@lists.openstack.org
  summary = OpenStack's setup automation in a reusable form
  description-file = README
+ home-page = https://launchpad.net/pbr
  license = Apache-2
  classifier =
      Development Status :: 4 - Beta
@@ -263,10 +264,13 @@ for installing entire directory structures, so::
 Will result in `/etc/neutron` containing `api-paste.ini` and `dhcp-agent.ini`,
 both of which pbr will expect to find in the `etc` directory in the root of
 the source tree. Additionally, `neutron.init` from that dir will be installed
-in `/etc/init.d`.
+in `/etc/init.d`. All of the files and directories located under `etc/pbr` in
+the source tree will be installed into `/etc/pbr`.
 
-All of the files and directories located under `etc/pbr` in the source tree
-will be installed into `/etc/pbr`.
+Note that this behavior is relative to the effective root of the environment
+into which the packages are installed, so depending on available permissions
+this could be the actual system-wide `/etc` directory or just a top-level `etc`
+subdirectory of a virtualenv.
 
 entry_points
 ------------
@@ -287,6 +291,19 @@ Will cause a console script called `pbr` to be installed that executes the
 installed for `pbr.config.drivers`, one called `plain` which maps to the
 `Plain` class in `pbr.cfg.driver` and one called `fancy` which maps to the
 `Fancy` class in `pbr.cfg.driver`.
+
+pbr
+---
+The pbr section controls pbr specific options and behaviours.
+
+The `autodoc_tree_index_modules` is a boolean value controlling whether pbr
+should generate an index of modules using `sphinx-apidoc`.
+
+The `autodoc_index_modules` is a boolean option controlling whether pbr should
+itself generates documentation for Python modules of the project. By default,
+all found Python modules are included; some of them can be excluded by listing
+them in `autodoc_exclude_modules`. This list of modules can contains `fnmatch`
+style pattern (e.g. `myapp.tests.*`) to exclude some modules.
 
 Additional Docs
 ===============
