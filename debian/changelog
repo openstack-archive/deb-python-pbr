@@ -1,4 +1,4 @@
-python-pbr (1.2.0-1) UNRELEASED; urgency=medium
+python-pbr (1.2.0-1) experimental; urgency=medium
 
   * Team upload.
   * New upstream release.
@@ -9,7 +9,7 @@ python-pbr (1.2.0-1) UNRELEASED; urgency=medium
     - d/control: Add XS-Testsuite: autopkgtest.
   * Update watch file to use Debian pypi redirector.
 
- -- James Page <james.page@ubuntu.com>  Mon, 08 Jun 2015 10:51:10 +0100
+ -- James Page <james.page@ubuntu.com>  Mon, 06 Jul 2015 11:29:04 +0100
 
 python-pbr (1.0.1-1) experimental; urgency=medium
 
