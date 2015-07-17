@@ -40,8 +40,6 @@ Build-Depends-Indep: python-coverage (>= 3.6),
                      python3-virtualenv,
                      subunit (>= 1.1.0),
                      testrepository,
-Build-Conflicts: python-pbr,
-                 python3-pbr,
 Standards-Version: 3.9.6
 Vcs-Browser: http://anonscm.debian.org/gitweb/?p=openstack/python-pbr.git
 Vcs-Git: git://anonscm.debian.org/openstack/python-pbr.git
