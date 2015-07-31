@@ -4,6 +4,7 @@ python-pbr (0.11.0-1) unstable; urgency=medium
   * Uploading to unstable.
   * Removed python-pip from Depends, as per discussion on the OpenStack list.
   * Removed Build-Conflicts:
+  * Removed all patches.
 
  -- Thomas Goirand <zigo@debian.org>  Fri, 31 Jul 2015 09:32:16 +0200
 
