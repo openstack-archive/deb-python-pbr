@@ -37,6 +37,11 @@
 # DISCLAIMED. IN NO EVENT SHALL AURA BE LIABLE FOR ANY DIRECT, INDIRECT,
 # INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
 # BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
+# OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+# ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR
+# TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
+# USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
+# DAMAGE.
 
 """The code in this module is mostly copy/pasted out of the distutils2 source
 code, as recommended by Tarek Ziade.  As such, it may be subject to some change
@@ -196,7 +201,7 @@ def cfg_to_args(path='setup.cfg'):
     """
 
     # The method source code really starts here.
-    parser = configparser.RawConfigParser()
+    parser = configparser.SafeConfigParser()
     if not os.path.exists(path):
         raise DistutilsFileError("file '%s' does not exist" %
                                  os.path.abspath(path))

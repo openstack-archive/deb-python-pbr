@@ -1,5 +1,3 @@
-# vim: tabstop=4 shiftwidth=4 softtabstop=4
-
 # Copyright 2013 Hewlett-Packard Development Company, L.P.
 # All Rights Reserved.
 #
@@ -43,6 +41,7 @@ class CommandsConfig(base.BaseConfig):
         self.add_command('pbr.packaging.LocalEggInfo')
         self.add_command('pbr.packaging.LocalSDist')
         self.add_command('pbr.packaging.LocalInstallScripts')
+        self.add_command('pbr.packaging.LocalDevelop')
         if os.name != 'nt':
             easy_install.get_script_args = packaging.override_get_script_args
 

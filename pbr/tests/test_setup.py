@@ -1,5 +1,3 @@
-# vim: tabstop=4 shiftwidth=4 softtabstop=4
-
 # Copyright (c) 2011 OpenStack Foundation
 # Copyright (c) 2013 Hewlett-Packard Development Company, L.P.
 # All Rights Reserved.
@@ -33,6 +31,7 @@ import fixtures
 import testscenarios
 
 from pbr import git
+from pbr import options
 from pbr import packaging
 from pbr.tests import base
 
@@ -97,7 +96,7 @@ class SkipFileWrites(base.BaseTestCase):
                       option_dict=self.option_dict)
         self.assertEqual(
             not os.path.exists(self.filename),
-            (self.option_value.lower() in packaging.TRUE_VALUES
+            (self.option_value.lower() in options.TRUE_VALUES
              or self.env_value is not None))
 
 _changelog_content = """04316fe (review/monty_taylor/27519) Make python
@@ -130,7 +129,8 @@ class GitLogsTest(base.BaseTestCase):
             "stdout": BytesIO(_changelog_content.encode('utf-8'))
         }))
 
-        git.write_git_changelog(git_dir=self.git_dir, dest_dir=self.temp_path)
+        git.write_git_changelog(git_dir=self.git_dir,
+                                dest_dir=self.temp_path)
 
         with open(os.path.join(self.temp_path, "ChangeLog"), "r") as ch_fh:
             changelog_contents = ch_fh.read()
@@ -177,7 +177,8 @@ class GitLogsTest(base.BaseTestCase):
         with open(os.path.join(self.temp_path, "AUTHORS.in"), "w") as auth_fh:
             auth_fh.write("%s\n" % author_old)
 
-        git.generate_authors(git_dir=self.git_dir, dest_dir=self.temp_path)
+        git.generate_authors(git_dir=self.git_dir,
+                             dest_dir=self.temp_path)
 
         with open(os.path.join(self.temp_path, "AUTHORS"), "r") as auth_fh:
             authors = auth_fh.read()
@@ -191,6 +192,10 @@ class BuildSphinxTest(base.BaseTestCase):
     scenarios = [
         ('true_autodoc_caps',
          dict(has_opt=True, autodoc='True', has_autodoc=True)),
+        ('true_autodoc_caps_with_excludes',
+         dict(has_opt=True, autodoc='True', has_autodoc=True,
+              excludes="fake_package.fake_private_module\n"
+              "fake_package.unknown_module")),
         ('true_autodoc_lower',
          dict(has_opt=True, autodoc='true', has_autodoc=True)),
         ('false_autodoc',
@@ -210,14 +215,21 @@ class BuildSphinxTest(base.BaseTestCase):
         self.distr.command_options["build_sphinx"] = {
             "source_dir": ["a", "."]}
         pkg_fixture = fixtures.PythonPackage(
-            "fake_package", [("fake_module.py", b"")])
+            "fake_package", [("fake_module.py", b""),
+                             ("fake_private_module.py", b"")])
         self.useFixture(pkg_fixture)
         self.useFixture(base.DiveDir(pkg_fixture.base))
+        self.distr.command_options["pbr"] = {}
+        if hasattr(self, "excludes"):
+            self.distr.command_options["pbr"]["autodoc_exclude_modules"] = (
+                'setup.cfg',
+                "fake_package.fake_private_module\n"
+                "fake_package.unknown_module")
+        if self.has_opt:
+            options = self.distr.command_options["pbr"]
+            options["autodoc_index_modules"] = ('setup.cfg', self.autodoc)
 
     def test_build_doc(self):
-        if self.has_opt:
-            self.distr.command_options["pbr"] = {
-                "autodoc_index_modules": ('setup.cfg', self.autodoc)}
         build_doc = packaging.LocalBuildDoc(self.distr)
         build_doc.run()
 
@@ -226,12 +238,15 @@ class BuildSphinxTest(base.BaseTestCase):
         self.assertTrue(
             os.path.exists(
                 "api/fake_package.fake_module.rst") == self.has_autodoc)
+        if not self.has_autodoc or hasattr(self, "excludes"):
+            assertion = self.assertFalse
+        else:
+            assertion = self.assertTrue
+        assertion(
+            os.path.exists(
+                "api/fake_package.fake_private_module.rst"))
 
     def test_builders_config(self):
-        if self.has_opt:
-            self.distr.command_options["pbr"] = {
-                "autodoc_index_modules": ('setup.cfg', self.autodoc)}
-
         build_doc = packaging.LocalBuildDoc(self.distr)
         build_doc.finalize_options()
 

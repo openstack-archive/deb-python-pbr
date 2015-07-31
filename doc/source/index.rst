@@ -10,6 +10,11 @@ the results in as the arguments to a call to `setup.py` - so the heavy
 lifting of handling python packaging needs is still being done by
 `setuptools`.
 
+Note that we don't support the `easy_install` aspects of setuptools: while
+we depend on setup_requires, for any install_requires we recommend that they
+be installed prior to running `setup.py install` - either by hand, or by using
+an install tool such as `pip`.
+
 What It Does
 ============
 
@@ -26,11 +31,37 @@ PBR can and does do a bunch of things for you:
 Version
 -------
 
-Version strings will be inferred from git. If a given revision is tagged,
-that's the version. If it's not, and you don't provide a version, the version
-will be very similar to git describe. If you do, then we'll assume that's the
-version you are working towards, and will generate alpha version strings
-based on commits since last tag and the current git sha.
+Versions can be managed two ways - postversioning and preversioning.
+Postversioning is the default, and preversioning is enabeld by setting
+``version`` in the setup.cfg ``metadata`` section. In both cases
+version strings are inferred from git.
+
+If a given revision is tagged, that's the version.
+
+If it's not, then we take the last tagged version number and increment it to
+get a minimum target version.
+
+We then walk git history back to the last release. Within each commit we look
+for a Sem-Ver: pseudo header, and if found parse it looking for keywords.
+Unknown symbols are not an error (so that folk can't wedge pbr or break their
+tree), but we will emit an info level warning message.  Known symbols:
+``feature``, ``api-break``, ``deprecation``, ``bugfix``. A missing
+Sem-Ver line is equivalent to ``Sem-Ver: bugfix``. The ``bugfix`` symbol causes
+a patch level increment to the version. The ``feature`` and ``deprecation``
+symbols cause a minor version increment. The ``api-break`` symbol causes a
+major version increment.
+
+If postversioning is in use, we use the resulting version number as the target
+version.
+
+If preversioning is in use - that is if there is a version set in setup.cfg
+metadata - then we check that that version is higher than the target version
+we inferred above. If it is not, we raise an error, otherwise we use the
+version from setup.cfg as the target.
+
+We then generate dev version strings based on the commits since the last
+release and include the current git sha to disambiguate multiple dev versions
+with the same number of commits since the release.
 
 .. note::
 
@@ -38,6 +69,11 @@ based on commits since last tag and the current git sha.
    calculate version.
 
 The versions are expected to be compliant with :doc:`semver`.
+
+The ``version.SemanticVersion`` class can be used to query versions of a
+package and present it in various forms - ``debian_version()``,
+``release_string()``, ``rpm_string()``, ``version_string()``, or
+``version_tuple()``.
 
 AUTHORS and ChangeLog
 ---------------------
@@ -221,6 +257,7 @@ Additional Docs
 
    packagers
    semver
+   testing
 
 Indices and tables
 ==================

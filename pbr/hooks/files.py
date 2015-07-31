@@ -1,5 +1,3 @@
-# vim: tabstop=4 shiftwidth=4 softtabstop=4
-
 # Copyright 2013 Hewlett-Packard Development Company, L.P.
 # All Rights Reserved.
 #
@@ -86,9 +84,13 @@ class FilesConfig(base.BaseConfig):
         return man_sections
 
     def hook(self):
-        package = self.config.get('packages', self.name).strip()
-        if os.path.isdir(package):
-            self.config['packages'] = find_package.smart_find_packages(package)
+        packages = self.config.get('packages', self.name).strip()
+        expanded = []
+        for pkg in packages.split("\n"):
+            if os.path.isdir(pkg.strip()):
+                expanded.append(find_package.smart_find_packages(pkg.strip()))
+
+        self.config['packages'] = "\n".join(expanded)
 
         self.expand_globs()
 

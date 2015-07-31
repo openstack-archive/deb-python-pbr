@@ -40,6 +40,7 @@ except Exception as e:
     # packaging.py where we try to determine if we can import and use
     # sphinx by importing this module.  See bug #1403510 for details.
     raise ImportError(str(e))
+from pbr import git
 from pbr import options
 
 
@@ -75,7 +76,7 @@ class LocalBuildDoc(setup_command.BuildDoc):
             os.makedirs(source_dir)
         return source_dir
 
-    def generate_autoindex(self):
+    def generate_autoindex(self, excluded_modules=None):
         log.info("[pbr] Autodocumenting from %s"
                  % os.path.abspath(os.curdir))
         modules = {}
@@ -84,8 +85,10 @@ class LocalBuildDoc(setup_command.BuildDoc):
             if '.' not in pkg:
                 for dirpath, dirnames, files in os.walk(pkg):
                     _find_modules(modules, dirpath, files)
-        module_list = list(modules.keys())
-        module_list.sort()
+        module_list = set(modules.keys())
+        if excluded_modules is not None:
+            module_list -= set(excluded_modules)
+        module_list = sorted(module_list)
         autoindex_filename = os.path.join(source_dir, 'autoindex.rst')
         with open(autoindex_filename, 'w') as autoindex:
             autoindex.write(""".. toctree::
@@ -108,7 +111,8 @@ class LocalBuildDoc(setup_command.BuildDoc):
 
     def _sphinx_tree(self):
             source_dir = self._get_source_dir()
-            apidoc.main(['apidoc', '.', '-H', 'Modules', '-o', source_dir])
+            cmd = ['apidoc', '.', '-H', 'Modules', '-o', source_dir]
+            apidoc.main(cmd + self.autodoc_tree_excludes)
 
     def _sphinx_run(self):
         if not self.verbose:
@@ -151,6 +155,9 @@ class LocalBuildDoc(setup_command.BuildDoc):
 
     def run(self):
         option_dict = self.distribution.get_option_dict('pbr')
+        if git._git_is_installed():
+            git.write_git_changelog(option_dict=option_dict)
+            git.generate_authors(option_dict=option_dict)
         tree_index = options.get_boolean_option(option_dict,
                                                 'autodoc_tree_index_modules',
                                                 'AUTODOC_TREE_INDEX_MODULES')
@@ -158,12 +165,15 @@ class LocalBuildDoc(setup_command.BuildDoc):
                                                 'autodoc_index_modules',
                                                 'AUTODOC_INDEX_MODULES')
         if not os.getenv('SPHINX_DEBUG'):
-            #NOTE(afazekas): These options can be used together,
-            # but they do a very similar thing in a difffernet way
+            # NOTE(afazekas): These options can be used together,
+            # but they do a very similar thing in a different way
             if tree_index:
                 self._sphinx_tree()
             if auto_index:
-                self.generate_autoindex()
+                self.generate_autoindex(
+                    option_dict.get(
+                        "autodoc_exclude_modules",
+                        [None, ""])[1].split())
 
         for builder in self.builders:
             self.builder = builder
@@ -171,10 +181,19 @@ class LocalBuildDoc(setup_command.BuildDoc):
             self.project = self.distribution.get_name()
             self.version = self.distribution.get_version()
             self.release = self.distribution.get_version()
-            if 'warnerrors' in option_dict:
+            if options.get_boolean_option(option_dict,
+                                          'warnerrors', 'WARNERRORS'):
                 self._sphinx_run()
             else:
                 setup_command.BuildDoc.run(self)
+
+    def initialize_options(self):
+        # Not a new style class, super keyword does not work.
+        setup_command.BuildDoc.initialize_options(self)
+
+        # NOTE(dstanek): exclude setup.py from the autodoc tree index
+        # builds because all projects will have an issue with it
+        self.autodoc_tree_excludes = ['setup.py']
 
     def finalize_options(self):
         # Not a new style class, super keyword does not work.
@@ -182,6 +201,14 @@ class LocalBuildDoc(setup_command.BuildDoc):
         # Allow builders to be configurable - as a comma separated list.
         if not isinstance(self.builders, list) and self.builders:
             self.builders = self.builders.split(',')
+
+        # NOTE(dstanek): check for autodoc tree exclusion overrides
+        # in the setup.cfg
+        opt = 'autodoc_tree_excludes'
+        option_dict = self.distribution.get_option_dict('pbr')
+        if opt in option_dict:
+            self.autodoc_tree_excludes = option_dict[opt][1]
+            self.ensure_string_list(opt)
 
 
 class LocalBuildLatex(LocalBuildDoc):
