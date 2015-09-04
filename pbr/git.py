@@ -18,10 +18,12 @@ from __future__ import unicode_literals
 
 import distutils.errors
 from distutils import log
+import errno
 import io
 import os
 import re
 import subprocess
+import time
 
 import pkg_resources
 
@@ -63,7 +65,13 @@ def _run_git_command(cmd, git_dir, **kwargs):
 
 
 def _get_git_directory():
-    return _run_shell_command(['git', 'rev-parse', '--git-dir'])
+    try:
+        return _run_shell_command(['git', 'rev-parse', '--git-dir'])
+    except OSError as e:
+        if e.errno == errno.ENOENT:
+            # git not installed.
+            return ''
+        raise
 
 
 def _git_is_installed():
@@ -161,7 +169,7 @@ def _iter_changelog(changelog):
         first_line = False
 
 
-def _iter_log_oneline(git_dir=None, option_dict=None):
+def _iter_log_oneline(git_dir=None):
     """Iterate over --oneline log entries if possible.
 
     This parses the output into a structured form but does not apply
@@ -171,16 +179,10 @@ def _iter_log_oneline(git_dir=None, option_dict=None):
     :return: An iterator of (hash, tags_set, 1st_line) tuples, or None if
         changelog generation is disabled / not available.
     """
-    if not option_dict:
-        option_dict = {}
-    should_skip = options.get_boolean_option(option_dict, 'skip_changelog',
-                                             'SKIP_WRITE_GIT_CHANGELOG')
-    if should_skip:
-        return
     if git_dir is None:
         git_dir = _get_git_directory()
     if not git_dir:
-        return
+        return []
     return _iter_log_inner(git_dir)
 
 
@@ -219,10 +221,17 @@ def _iter_log_inner(git_dir):
 
 
 def write_git_changelog(git_dir=None, dest_dir=os.path.curdir,
-                        option_dict=dict(), changelog=None):
+                        option_dict=None, changelog=None):
     """Write a changelog based on the git changelog."""
+    start = time.time()
+    if not option_dict:
+        option_dict = {}
+    should_skip = options.get_boolean_option(option_dict, 'skip_changelog',
+                                             'SKIP_WRITE_GIT_CHANGELOG')
+    if should_skip:
+        return
     if not changelog:
-        changelog = _iter_log_oneline(git_dir=git_dir, option_dict=option_dict)
+        changelog = _iter_log_oneline(git_dir=git_dir)
         if changelog:
             changelog = _iter_changelog(changelog)
     if not changelog:
@@ -236,6 +245,8 @@ def write_git_changelog(git_dir=None, dest_dir=os.path.curdir,
     with io.open(new_changelog, "w", encoding="utf-8") as changelog_file:
         for release, content in changelog:
             changelog_file.write(content)
+    stop = time.time()
+    log.info('[pbr] ChangeLog complete (%0.1fs)' % (stop - start))
 
 
 def generate_authors(git_dir=None, dest_dir='.', option_dict=dict()):
@@ -244,6 +255,7 @@ def generate_authors(git_dir=None, dest_dir='.', option_dict=dict()):
                                              'SKIP_GENERATE_AUTHORS')
     if should_skip:
         return
+    start = time.time()
     old_authors = os.path.join(dest_dir, 'AUTHORS.in')
     new_authors = os.path.join(dest_dir, 'AUTHORS')
     # If there's already an AUTHORS file and it's not writable, just use it
@@ -278,3 +290,5 @@ def generate_authors(git_dir=None, dest_dir='.', option_dict=dict()):
                     new_authors_fh.write(old_authors_fh.read())
             new_authors_fh.write(('\n'.join(authors) + '\n')
                                  .encode('utf-8'))
+    stop = time.time()
+    log.info('[pbr] AUTHORS complete (%0.1fs)' % (stop - start))

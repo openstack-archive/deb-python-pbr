@@ -156,21 +156,23 @@ class TestPackagingInGitRepoWithCommit(base.BaseTestCase):
         super(TestPackagingInGitRepoWithCommit, self).setUp()
         repo = self.useFixture(TestRepo(self.package_dir))
         repo.commit()
-        self.run_setup('sdist', allow_fail=False)
 
     def test_authors(self):
+        self.run_setup('sdist', allow_fail=False)
         # One commit, something should be in the authors list
         with open(os.path.join(self.package_dir, 'AUTHORS'), 'r') as f:
             body = f.read()
         self.assertNotEqual(body, '')
 
     def test_changelog(self):
+        self.run_setup('sdist', allow_fail=False)
         with open(os.path.join(self.package_dir, 'ChangeLog'), 'r') as f:
             body = f.read()
         # One commit, something should be in the ChangeLog list
         self.assertNotEqual(body, '')
 
     def test_manifest_exclude_honoured(self):
+        self.run_setup('sdist', allow_fail=False)
         with open(os.path.join(
                 self.package_dir,
                 'pbr_testpackage.egg-info/SOURCES.txt'), 'r') as f:
@@ -178,6 +180,12 @@ class TestPackagingInGitRepoWithCommit(base.BaseTestCase):
         self.assertThat(
             body, matchers.Not(matchers.Contains('pbr_testpackage/extra.py')))
         self.assertThat(body, matchers.Contains('pbr_testpackage/__init__.py'))
+
+    def test_install_writes_changelog(self):
+        stdout, _, _ = self.run_setup(
+            'install', '--root', self.temp_dir + 'installed',
+            allow_fail=False)
+        self.expectThat(stdout, matchers.Contains('Generating ChangeLog'))
 
 
 class TestPackagingInGitRepoWithoutCommit(base.BaseTestCase):
@@ -204,17 +212,25 @@ class TestPackagingInPlainDirectory(base.BaseTestCase):
 
     def setUp(self):
         super(TestPackagingInPlainDirectory, self).setUp()
-        self.run_setup('sdist', allow_fail=False)
 
     def test_authors(self):
+        self.run_setup('sdist', allow_fail=False)
         # Not a git repo, no AUTHORS file created
         filename = os.path.join(self.package_dir, 'AUTHORS')
         self.assertFalse(os.path.exists(filename))
 
     def test_changelog(self):
+        self.run_setup('sdist', allow_fail=False)
         # Not a git repo, no ChangeLog created
         filename = os.path.join(self.package_dir, 'ChangeLog')
         self.assertFalse(os.path.exists(filename))
+
+    def test_install_no_ChangeLog(self):
+        stdout, _, _ = self.run_setup(
+            'install', '--root', self.temp_dir + 'installed',
+            allow_fail=False)
+        self.expectThat(
+            stdout, matchers.Not(matchers.Contains('Generating ChangeLog')))
 
 
 class TestPresenceOfGit(base.BaseTestCase):
@@ -428,6 +444,18 @@ class TestVersions(base.BaseTestCase):
         version = packaging._get_version_from_git()
         self.assertEqual('1.3.0.0a1', version)
 
+    def test_skip_write_git_changelog(self):
+        # Fix for bug 1467440
+        self.repo.commit()
+        self.repo.tag('1.2.3')
+        os.environ['SKIP_WRITE_GIT_CHANGELOG'] = '1'
+        version = packaging._get_version_from_git('1.2.3')
+        self.assertEqual('1.2.3', version)
+
+    def tearDown(self):
+        super(TestVersions, self).tearDown()
+        os.environ.pop('SKIP_WRITE_GIT_CHANGELOG', None)
+
 
 class TestRequirementParsing(base.BaseTestCase):
 
@@ -438,6 +466,9 @@ class TestRequirementParsing(base.BaseTestCase):
             f.write(textwrap.dedent(six.u("""\
                 bar
                 quux<1.0; python_version=='2.6'
+                requests-aws>=0.1.4    # BSD License (3 clause)
+                Routes>=1.12.3,!=2.0,!=2.1;python_version=='2.7'
+                requests-kerberos>=0.6;python_version=='2.7' # MIT
             """)))
         setup_cfg = os.path.join(tempdir, 'setup.cfg')
         with open(setup_cfg, 'wt') as f:
@@ -453,11 +484,14 @@ class TestRequirementParsing(base.BaseTestCase):
         # pkg_resources.split_sections uses None as the title of an
         # anonymous section instead of the empty string. Weird.
         expected_requirements = {
-            None: ['bar'],
+            None: ['bar', 'requests-aws>=0.1.4'],
             ":(python_version=='2.6')": ['quux<1.0'],
-            "test:(python_version=='2.7')": ['baz>3.2'],
-            "test": ['foo']
+            ":(python_version=='2.7')": ['Routes>=1.12.3,!=2.0,!=2.1',
+                                         'requests-kerberos>=0.6'],
+            'test': ['foo'],
+            "test:(python_version=='2.7')": ['baz>3.2']
         }
+
         setup_py = os.path.join(tempdir, 'setup.py')
         with open(setup_py, 'wt') as f:
             f.write(textwrap.dedent(six.u("""\

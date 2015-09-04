@@ -28,6 +28,7 @@ import re
 import sys
 
 import pkg_resources
+import setuptools
 from setuptools.command import develop
 from setuptools.command import easy_install
 from setuptools.command import egg_info
@@ -131,6 +132,7 @@ def parse_requirements(requirements_files=None, strip_markers=False):
             reason = 'Index Location'
 
         if line is not None:
+            line = re.sub('#.*$', '', line)
             if strip_markers:
                 semi_pos = line.find(';')
                 if semi_pos < 0:
@@ -163,6 +165,20 @@ def parse_dependency_links(requirements_files=None):
     return dependency_links
 
 
+class InstallWithGit(install.install):
+    """Extracts ChangeLog and AUTHORS from git then installs.
+
+    This is useful for e.g. readthedocs where the package is
+    installed and then docs built.
+    """
+
+    command_name = 'install'
+
+    def run(self):
+        _from_git(self.distribution)
+        return install.install.run(self)
+
+
 class LocalInstall(install.install):
     """Runs python setup.py install in a sensible manner.
 
@@ -174,6 +190,7 @@ class LocalInstall(install.install):
     command_name = 'install'
 
     def run(self):
+        _from_git(self.distribution)
         return du_install.install.run(self)
 
 
@@ -185,6 +202,25 @@ class TestrTest(testr_command.Testr):
     def run(self):
         # Can't use super - base class old-style class
         testr_command.Testr.run(self)
+
+
+class LocalRPMVersion(setuptools.Command):
+    __doc__ = """Output the rpm *compatible* version string of this package"""
+    description = __doc__
+
+    user_options = []
+    command_name = "rpm_version"
+
+    def run(self):
+        log.info("[pbr] Extracting rpm version")
+        name = self.distribution.get_name()
+        print(version.VersionInfo(name).semantic_version().rpm_string())
+
+    def initialize_options(self):
+        pass
+
+    def finalize_options(self):
+        pass
 
 
 def have_testr():
@@ -212,6 +248,36 @@ except ImportError:
 def have_nose():
     return _have_nose
 
+_wsgi_text = """#PBR Generated from %(group)r
+
+from %(module_name)s import %(import_target)s
+
+if __name__ == "__main__":
+    import argparse
+    import socket
+    import wsgiref.simple_server as wss
+
+    my_ip = socket.gethostbyname(socket.gethostname())
+    parser = argparse.ArgumentParser(
+        description=%(import_target)s.__doc__,
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument('--port', '-p', type=int, default=8000,
+                        help='TCP port to listen on')
+    args = parser.parse_args()
+    server = wss.make_server('', args.port, %(invoke_target)s())
+
+    print("*" * 80)
+    print("STARTING test server %(module_name)s.%(invoke_target)s")
+    url = "http://%%s:%%d/" %% (my_ip, server.server_port)
+    print("Available at %%s" %% url)
+    print("DANGER! For testing only, do not use in production")
+    print("*" * 80)
+
+    server.serve_forever()
+else:
+    application = %(invoke_target)s()
+
+"""
 
 _script_text = """# PBR Generated from %(group)r
 
@@ -225,16 +291,25 @@ if __name__ == "__main__":
 """
 
 
+# the following allows us to specify different templates per entry
+# point group when generating pbr scripts.
+ENTRY_POINTS_MAP = {
+    'console_scripts': _script_text,
+    'gui_scripts': _script_text,
+    'wsgi_scripts': _wsgi_text
+}
+
+
 def override_get_script_args(
         dist, executable=os.path.normpath(sys.executable), is_wininst=False):
     """Override entrypoints console_script."""
     header = easy_install.get_script_header("", executable, is_wininst)
-    for group in 'console_scripts', 'gui_scripts':
+    for group, template in ENTRY_POINTS_MAP.items():
         for name, ep in dist.get_entry_map(group).items():
             if not ep.attrs or len(ep.attrs) > 2:
                 raise ValueError("Script targets must be of the form "
                                  "'func' or 'Class.class_method'.")
-            script_text = _script_text % dict(
+            script_text = template % dict(
                 group=group,
                 module_name=ep.module_name,
                 import_target=ep.attrs[0],
@@ -358,18 +433,22 @@ class LocalEggInfo(egg_info.egg_info):
                 self.filelist.append(entry)
 
 
+def _from_git(distribution):
+    option_dict = distribution.get_option_dict('pbr')
+    changelog = git._iter_log_oneline()
+    if changelog:
+        changelog = git._iter_changelog(changelog)
+    git.write_git_changelog(option_dict=option_dict, changelog=changelog)
+    git.generate_authors(option_dict=option_dict)
+
+
 class LocalSDist(sdist.sdist):
     """Builds the ChangeLog and Authors files from VC first."""
 
     command_name = 'sdist'
 
     def run(self):
-        option_dict = self.distribution.get_option_dict('pbr')
-        changelog = git._iter_log_oneline(option_dict=option_dict)
-        if changelog:
-            changelog = git._iter_changelog(changelog)
-        git.write_git_changelog(option_dict=option_dict, changelog=changelog)
-        git.generate_authors(option_dict=option_dict)
+        _from_git(self.distribution)
         # sdist.sdist is an old style class, can't use super()
         sdist.sdist.run(self)
 
