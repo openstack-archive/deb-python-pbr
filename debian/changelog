@@ -1,3 +1,9 @@
+python-pbr (1.8.0-2) experimental; urgency=medium
+
+  * Re-added python{3,}-all-dev, the package really needs them!
+
+ -- Thomas Goirand <zigo@debian.org>  Wed, 23 Sep 2015 13:51:37 +0000
+
 python-pbr (1.8.0-1) experimental; urgency=medium
 
   * New upstream release.
