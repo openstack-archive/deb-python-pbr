@@ -1,3 +1,9 @@
+python-pbr (1.8.0-1) experimental; urgency=medium
+
+  * New upstream release.
+
+ -- Thomas Goirand <zigo@debian.org>  Wed, 23 Sep 2015 14:49:54 +0200
+
 python-pbr (1.6.0-1) experimental; urgency=medium
 
   * New upstream release.
