@@ -1,6 +1,7 @@
 python-pbr (1.8.0-1) experimental; urgency=medium
 
   * New upstream release.
+  * Do not build-depends on python{3,}-all-dev, but just -all (Closes: #799679)
 
  -- Thomas Goirand <zigo@debian.org>  Wed, 23 Sep 2015 14:49:54 +0200
 
