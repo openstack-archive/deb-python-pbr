@@ -1,3 +1,9 @@
+python-pbr (1.8.0-3) unstable; urgency=medium
+
+  * Uploading to unstable.
+
+ -- Thomas Goirand <zigo@debian.org>  Thu, 15 Oct 2015 17:56:49 +0000
+
 python-pbr (1.8.0-2) experimental; urgency=medium
 
   * Re-added python{3,}-all-dev, the package really needs them!
