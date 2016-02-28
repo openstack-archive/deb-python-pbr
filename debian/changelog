@@ -1,6 +1,10 @@
 python-pbr (1.8.1-1) UNRELEASED; urgency=medium
 
+  [ Thomas Goirand ]
   * New upstream release.
+
+  [ Ondřej Nový ]
+  * Fixed homepage (https).
 
  -- Thomas Goirand <zigo@debian.org>  Tue, 24 Nov 2015 17:34:58 +0100
 
