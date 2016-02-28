@@ -5,6 +5,7 @@ python-pbr (1.8.1-1) UNRELEASED; urgency=medium
 
   [ Ondřej Nový ]
   * Fixed homepage (https).
+  * Fixed VCS URLs (https).
 
  -- Thomas Goirand <zigo@debian.org>  Tue, 24 Nov 2015 17:34:58 +0100
 
