@@ -9,6 +9,13 @@ python-pbr (1.8.1-1) UNRELEASED; urgency=medium
 
  -- Thomas Goirand <zigo@debian.org>  Tue, 24 Nov 2015 17:34:58 +0100
 
+ python-pbr (1.8.0-4.1) unstable; urgency=medium
+ .
+   * Non-maintainer upload.
+   * Depend on python{3,}-pkg-resources (Closes: #823071)
+
+ -- Stefano Rivera <stefanor@debian.org>  Fri, 06 May 2016 23:41:16 +0200
+
 python-pbr (1.8.0-4) unstable; urgency=medium
 
   * override_dh_python3 to fix Py3 shebang.
