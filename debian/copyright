@@ -1,7 +1,7 @@
 Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: pbr
 Upstream-Contact: OpenStack Devel <openstack-dev@lists.openstack.org>
-Source: http://pypi.python.org/pypi/pbr
+Source: https://pypi.python.org/pypi/pbr
 
 Files: debian/*
 Copyright: (c) 2013, Thomas Goirand <zigo@debian.org>
