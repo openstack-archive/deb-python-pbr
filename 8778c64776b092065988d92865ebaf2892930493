@@ -1,0 +1,9 @@
+Code-Review+2: Julien Danjou <julien@danjou.info>
+Code-Review+2: Brant Knudson <bknudson@us.ibm.com>
+Workflow+1: Brant Knudson <bknudson@us.ibm.com>
+Verified+2: Jenkins
+Submitted-by: Jenkins
+Submitted-at: Mon, 18 Apr 2016 20:43:09 +0000
+Reviewed-on: https://review.openstack.org/296061
+Project: openstack/deb-python-pbr
+Branch: refs/heads/master

@@ -1,0 +1,9 @@
+Code-Review+2: lifeless <robertc@robertcollins.net>
+Code-Review+2: Clark Boylan <cboylan@sapwetik.org>
+Workflow+1: Clark Boylan <cboylan@sapwetik.org>
+Verified+2: Jenkins
+Submitted-by: Jenkins
+Submitted-at: Fri, 11 Dec 2015 02:14:54 +0000
+Reviewed-on: https://review.openstack.org/255616
+Project: openstack/deb-python-pbr
+Branch: refs/heads/master

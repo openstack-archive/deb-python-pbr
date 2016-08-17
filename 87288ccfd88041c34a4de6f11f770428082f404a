@@ -1,0 +1,10 @@
+Code-Review+2: lifeless <robertc@robertcollins.net>
+Code-Review+1: Ian Cordasco <ian.cordasco@rackspace.com>
+Code-Review+2: Sachi King <nakato@nakato.io>
+Workflow+1: Sachi King <nakato@nakato.io>
+Verified+2: Jenkins
+Submitted-by: Jenkins
+Submitted-at: Wed, 20 Jul 2016 05:15:29 +0000
+Reviewed-on: https://review.openstack.org/332612
+Project: openstack/deb-python-pbr
+Branch: refs/heads/master

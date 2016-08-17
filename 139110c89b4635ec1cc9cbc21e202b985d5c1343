@@ -1,0 +1,9 @@
+Code-Review+2: lifeless <robertc@robertcollins.net>
+Code-Review+2: Monty Taylor <mordred@inaugust.com>
+Workflow+1: Monty Taylor <mordred@inaugust.com>
+Verified+2: Jenkins
+Submitted-by: Jenkins
+Submitted-at: Tue, 22 Mar 2016 23:49:07 +0000
+Reviewed-on: https://review.openstack.org/280270
+Project: openstack/deb-python-pbr
+Branch: refs/heads/master

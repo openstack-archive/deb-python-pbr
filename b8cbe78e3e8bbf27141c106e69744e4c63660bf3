@@ -1,0 +1,10 @@
+Code-Review+1: Craige McWhirter <craige@mcwhirter.io>
+Code-Review+2: lifeless <robertc@robertcollins.net>
+Code-Review+2: Davanum Srinivas (dims) <davanum@gmail.com>
+Workflow+1: Davanum Srinivas (dims) <davanum@gmail.com>
+Verified+2: Jenkins
+Submitted-by: Jenkins
+Submitted-at: Mon, 16 Nov 2015 14:26:13 +0000
+Reviewed-on: https://review.openstack.org/240367
+Project: openstack/deb-python-pbr
+Branch: refs/heads/master

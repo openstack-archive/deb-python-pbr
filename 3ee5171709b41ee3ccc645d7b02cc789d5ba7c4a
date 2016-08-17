@@ -1,0 +1,9 @@
+Code-Review+2: Sachi King <nakato@nakato.io>
+Code-Review+2: Julien Danjou <julien@danjou.info>
+Workflow+1: Julien Danjou <julien@danjou.info>
+Verified+2: Jenkins
+Submitted-by: Jenkins
+Submitted-at: Wed, 09 Mar 2016 12:12:23 +0000
+Reviewed-on: https://review.openstack.org/289623
+Project: openstack/deb-python-pbr
+Branch: refs/heads/master

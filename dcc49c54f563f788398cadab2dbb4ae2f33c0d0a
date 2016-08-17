@@ -1,0 +1,9 @@
+Code-Review+2: Doug Hellmann <doug@doughellmann.com>
+Code-Review+2: lifeless <robertc@robertcollins.net>
+Workflow+1: lifeless <robertc@robertcollins.net>
+Verified+2: Jenkins
+Submitted-by: Jenkins
+Submitted-at: Fri, 22 Apr 2016 10:14:25 +0000
+Reviewed-on: https://review.openstack.org/305595
+Project: openstack/deb-python-pbr
+Branch: refs/heads/master

@@ -1,0 +1,10 @@
+Code-Review+2: Julien Danjou <julien@danjou.info>
+Code-Review+1: James Polley <jp@jamezpolley.com>
+Code-Review+2: lifeless <robertc@robertcollins.net>
+Workflow+1: lifeless <robertc@robertcollins.net>
+Verified+2: Jenkins
+Submitted-by: Jenkins
+Submitted-at: Wed, 09 Mar 2016 01:26:08 +0000
+Reviewed-on: https://review.openstack.org/289689
+Project: openstack/deb-python-pbr
+Branch: refs/heads/master
