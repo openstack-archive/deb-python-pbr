@@ -1,4 +1,5 @@
 [gerrit]
 host=review.openstack.org
 port=29418
-project=openstack-dev/pbr.git
+project=openstack/deb-python-pbr.git
+defaultbranch=debian/newton
