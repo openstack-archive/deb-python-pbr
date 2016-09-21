@@ -38,8 +38,8 @@ Build-Depends-Indep: python-coverage,
                      subunit (>= 1.1.0),
                      testrepository,
 Standards-Version: 3.9.6
-Vcs-Browser: https://anonscm.debian.org/cgit/openstack/python-pbr.git/
-Vcs-Git: https://anonscm.debian.org/git/openstack/python-pbr.git
+Vcs-Browser: https://git.openstack.org/cgit/openstack/deb-python-pbr
+Vcs-Git: https://git.openstack.org/openstack/deb-python-pbr
 Homepage: https://pypi.python.org/pypi/pbr
 XS-Testsuite: autopkgtest
 
