@@ -38,9 +38,12 @@
 # INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
 # BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
 
+import email
+import email.errors
+import imp
 import os
 import re
-import sys
+import sysconfig
 import tempfile
 import textwrap
 
@@ -48,11 +51,17 @@ import fixtures
 import mock
 import pkg_resources
 import six
+import testtools
 from testtools import matchers
+import virtualenv
+import wheel.install
 
 from pbr import git
 from pbr import packaging
 from pbr.tests import base
+
+
+PBR_ROOT = os.path.abspath(os.path.join(__file__, '..', '..', '..'))
 
 
 class TestRepo(fixtures.Fixture):
@@ -144,6 +153,114 @@ class GPGKeyFixture(fixtures.Fixture):
             tempdir.path)
 
 
+class Venv(fixtures.Fixture):
+    """Create a virtual environment for testing with.
+
+    :attr path: The path to the environment root.
+    :attr python: The path to the python binary in the environment.
+    """
+
+    def __init__(self, reason, modules=(), pip_cmd=None):
+        """Create a Venv fixture.
+
+        :param reason: A human readable string to bake into the venv
+            file path to aid diagnostics in the case of failures.
+        :param modules: A list of modules to install, defaults to latest
+            pip, wheel, and the working copy of PBR.
+        :attr pip_cmd: A list to override the default pip_cmd passed to
+            python for installing base packages.
+        """
+        self._reason = reason
+        if modules == ():
+            pbr = 'file://%s#egg=pbr' % PBR_ROOT
+            modules = ['pip', 'wheel', pbr]
+        self.modules = modules
+        if pip_cmd is None:
+            self.pip_cmd = ['-m', 'pip', 'install']
+        else:
+            self.pip_cmd = pip_cmd
+
+    def _setUp(self):
+        path = self.useFixture(fixtures.TempDir()).path
+        virtualenv.create_environment(path, clear=True)
+        python = os.path.join(path, 'bin', 'python')
+        command = [python] + self.pip_cmd + ['-U']
+        if self.modules and len(self.modules) > 0:
+            command.extend(self.modules)
+            self.useFixture(base.CapturedSubprocess(
+                'mkvenv-' + self._reason, command))
+        self.addCleanup(delattr, self, 'path')
+        self.addCleanup(delattr, self, 'python')
+        self.path = path
+        self.python = python
+        return path, python
+
+
+class CreatePackages(fixtures.Fixture):
+    """Creates packages from dict with defaults
+
+        :param package_dirs: A dict of package name to directory strings
+        {'pkg_a': '/tmp/path/to/tmp/pkg_a', 'pkg_b': '/tmp/path/to/tmp/pkg_b'}
+    """
+
+    defaults = {
+        'setup.py': textwrap.dedent(six.u("""\
+            #!/usr/bin/env python
+            import setuptools
+            setuptools.setup(
+                setup_requires=['pbr'],
+                pbr=True,
+            )
+        """)),
+        'setup.cfg': textwrap.dedent(six.u("""\
+            [metadata]
+            name = {pkg_name}
+        """))
+    }
+
+    def __init__(self, packages):
+        """Creates packages from dict with defaults
+
+            :param packages: a dict where the keys are the package name and a
+            value that is a second dict that may be empty, containing keys of
+            filenames and a string value of the contents.
+            {'package-a': {'requirements.txt': 'string', 'setup.cfg': 'string'}
+        """
+        self.packages = packages
+
+    def _writeFile(self, directory, file_name, contents):
+        path = os.path.abspath(os.path.join(directory, file_name))
+        path_dir = os.path.dirname(path)
+        if not os.path.exists(path_dir):
+            if path_dir.startswith(directory):
+                os.makedirs(path_dir)
+            else:
+                raise ValueError
+        with open(path, 'wt') as f:
+            f.write(contents)
+
+    def _setUp(self):
+        tmpdir = self.useFixture(fixtures.TempDir()).path
+        package_dirs = {}
+        for pkg_name in self.packages:
+            pkg_path = os.path.join(tmpdir, pkg_name)
+            package_dirs[pkg_name] = pkg_path
+            os.mkdir(pkg_path)
+            for cf in ['setup.py', 'setup.cfg']:
+                if cf in self.packages[pkg_name]:
+                    contents = self.packages[pkg_name].pop(cf)
+                else:
+                    contents = self.defaults[cf].format(pkg_name=pkg_name)
+                self._writeFile(pkg_path, cf, contents)
+
+            for cf in self.packages[pkg_name]:
+                self._writeFile(pkg_path, cf, self.packages[pkg_name][cf])
+            self.useFixture(TestRepo(pkg_path)).commit()
+        self.addCleanup(delattr, self, 'package_dirs')
+        self.package_dirs = package_dirs
+        return package_dirs
+
+
 class TestPackagingInGitRepoWithCommit(base.BaseTestCase):
 
     scenarios = [
@@ -205,6 +322,94 @@ class TestPackagingInGitRepoWithoutCommit(base.BaseTestCase):
         with open(os.path.join(self.package_dir, 'ChangeLog'), 'r') as f:
             body = f.read()
         self.assertEqual(body, 'CHANGES\n=======\n\n')
+
+
+class TestPackagingWheels(base.BaseTestCase):
+
+    def setUp(self):
+        super(TestPackagingWheels, self).setUp()
+        self.useFixture(TestRepo(self.package_dir))
+        # Build the wheel
+        self.run_setup('bdist_wheel', allow_fail=False)
+        # Slowly construct the path to the generated whl
+        dist_dir = os.path.join(self.package_dir, 'dist')
+        relative_wheel_filename = os.listdir(dist_dir)[0]
+        absolute_wheel_filename = os.path.join(
+            dist_dir, relative_wheel_filename)
+        wheel_file = wheel.install.WheelFile(absolute_wheel_filename)
+        wheel_name = wheel_file.parsed_filename.group('namever')
+        # Create a directory path to unpack the wheel to
+        self.extracted_wheel_dir = os.path.join(dist_dir, wheel_name)
+        # Extract the wheel contents to the directory we just created
+        wheel_file.zipfile.extractall(self.extracted_wheel_dir)
+        wheel_file.zipfile.close()
+
+    def test_data_directory_has_wsgi_scripts(self):
+        # Build the path to the scripts directory
+        scripts_dir = os.path.join(
+            self.extracted_wheel_dir, 'pbr_testpackage-0.0.data/scripts')
+        self.assertTrue(os.path.exists(scripts_dir))
+        scripts = os.listdir(scripts_dir)
+
+        self.assertIn('pbr_test_wsgi', scripts)
+        self.assertIn('pbr_test_wsgi_with_class', scripts)
+        self.assertNotIn('pbr_test_cmd', scripts)
+        self.assertNotIn('pbr_test_cmd_with_class', scripts)
+
+    def test_generates_c_extensions(self):
+        built_package_dir = os.path.join(
+            self.extracted_wheel_dir, 'pbr_testpackage')
+        static_object_filename = 'testext.so'
+        soabi = get_soabi()
+        if soabi:
+            static_object_filename = 'testext.{0}.so'.format(soabi)
+        static_object_path = os.path.join(
+            built_package_dir, static_object_filename)
+
+        self.assertTrue(os.path.exists(built_package_dir))
+        self.assertTrue(os.path.exists(static_object_path))
+
+
+class TestPackagingHelpers(testtools.TestCase):
+
+    def test_generate_script(self):
+        group = 'console_scripts'
+        entry_point = pkg_resources.EntryPoint(
+            name='test-ep',
+            module_name='pbr.packaging',
+            attrs=('LocalInstallScripts',))
+        header = '#!/usr/bin/env fake-header\n'
+        template = ('%(group)s %(module_name)s %(import_target)s '
+                    '%(invoke_target)s')
+
+        generated_script = packaging.generate_script(
+            group, entry_point, header, template)
+
+        expected_script = (
+            '#!/usr/bin/env fake-header\nconsole_scripts pbr.packaging '
+            'LocalInstallScripts LocalInstallScripts'
+        )
+        self.assertEqual(expected_script, generated_script)
+
+    def test_generate_script_validates_expectations(self):
+        group = 'console_scripts'
+        entry_point = pkg_resources.EntryPoint(
+            name='test-ep',
+            module_name='pbr.packaging')
+        header = '#!/usr/bin/env fake-header\n'
+        template = ('%(group)s %(module_name)s %(import_target)s '
+                    '%(invoke_target)s')
+        self.assertRaises(
+            ValueError, packaging.generate_script, group, entry_point, header,
+            template)
+
+        entry_point = pkg_resources.EntryPoint(
+            name='test-ep',
+            module_name='pbr.packaging',
+            attrs=('attr1', 'attr2', 'attr3'))
+        self.assertRaises(
+            ValueError, packaging.generate_script, group, entry_point, header,
+            template)
 
 
 class TestPackagingInPlainDirectory(base.BaseTestCase):
@@ -274,6 +479,19 @@ class TestVersions(base.BaseTestCase):
         self.useFixture(GPGKeyFixture())
         self.useFixture(base.DiveDir(self.package_dir))
 
+    def test_email_parsing_errors_are_handled(self):
+        mocked_open = mock.mock_open()
+        with mock.patch('pbr.packaging.open', mocked_open):
+            with mock.patch('email.message_from_file') as message_from_file:
+                message_from_file.side_effect = [
+                    email.errors.MessageError('Test'),
+                    {'Name': 'pbr_testpackage'}]
+                version = packaging._get_version_from_pkg_metadata(
+                    'pbr_testpackage')
+
+        self.assertTrue(message_from_file.called)
+        self.assertIsNone(version)
+
     def test_capitalized_headers(self):
         self.repo.commit()
         self.repo.tag('1.2.3')
@@ -293,6 +511,13 @@ class TestVersions(base.BaseTestCase):
         self.repo.tag('1.2.3')
         version = packaging._get_version_from_git('1.2.3')
         self.assertEqual('1.2.3', version)
+
+    def test_non_canonical_tagged_version_bump(self):
+        self.repo.commit()
+        self.repo.tag('1.4')
+        self.repo.commit('Sem-Ver: api-break')
+        version = packaging._get_version_from_git()
+        self.assertThat(version, matchers.StartsWith('2.0.0.dev1'))
 
     def test_untagged_version_has_dev_version_postversion(self):
         self.repo.commit()
@@ -459,28 +684,29 @@ class TestVersions(base.BaseTestCase):
 class TestRequirementParsing(base.BaseTestCase):
 
     def test_requirement_parsing(self):
-        tempdir = self.useFixture(fixtures.TempDir()).path
-        requirements = os.path.join(tempdir, 'requirements.txt')
-        with open(requirements, 'wt') as f:
-            f.write(textwrap.dedent(six.u("""\
-                bar
-                quux<1.0; python_version=='2.6'
-                requests-aws>=0.1.4    # BSD License (3 clause)
-                Routes>=1.12.3,!=2.0,!=2.1;python_version=='2.7'
-                requests-kerberos>=0.6;python_version=='2.7' # MIT
-            """)))
-        setup_cfg = os.path.join(tempdir, 'setup.cfg')
-        with open(setup_cfg, 'wt') as f:
-            f.write(textwrap.dedent(six.u("""\
-                [metadata]
-                name = test_reqparse
+        pkgs = {
+            'test_reqparse':
+                {
+                    'requirements.txt': textwrap.dedent("""\
+                        bar
+                        quux<1.0; python_version=='2.6'
+                        requests-aws>=0.1.4    # BSD License (3 clause)
+                        Routes>=1.12.3,!=2.0,!=2.1;python_version=='2.7'
+                        requests-kerberos>=0.6;python_version=='2.7' # MIT
+                    """),
+                    'setup.cfg': textwrap.dedent("""\
+                        [metadata]
+                        name = test_reqparse
 
-                [extras]
-                test =
-                    foo
-                    baz>3.2 :python_version=='2.7' # MIT
-                    bar>3.3 :python_version=='2.7' # MIT # Apache
-            """)))
+                        [extras]
+                        test =
+                            foo
+                            baz>3.2 :python_version=='2.7' # MIT
+                            bar>3.3 :python_version=='2.7' # MIT # Apache
+                    """)},
+        }
+        pkg_dirs = self.useFixture(CreatePackages(pkgs)).package_dirs
+        pkg_dir = pkg_dirs['test_reqparse']
         # pkg_resources.split_sections uses None as the title of an
         # anonymous section instead of the empty string. Weird.
         expected_requirements = {
@@ -491,21 +717,14 @@ class TestRequirementParsing(base.BaseTestCase):
             'test': ['foo'],
             "test:(python_version=='2.7')": ['baz>3.2', 'bar>3.3']
         }
-
-        setup_py = os.path.join(tempdir, 'setup.py')
-        with open(setup_py, 'wt') as f:
-            f.write(textwrap.dedent(six.u("""\
-                #!/usr/bin/env python
-                import setuptools
-                setuptools.setup(
-                    setup_requires=['pbr'],
-                    pbr=True,
-                )
-            """)))
-
-        self._run_cmd(sys.executable, (setup_py, 'egg_info'),
-                      allow_fail=False, cwd=tempdir)
-        egg_info = os.path.join(tempdir, 'test_reqparse.egg-info')
+        venv = self.useFixture(Venv('reqParse'))
+        bin_python = venv.python
+        # Two things are tested by this
+        # 1) pbr properly parses markers from requiremnts.txt and setup.cfg
+        # 2) bdist_wheel causes pbr to not evaluate markers
+        self._run_cmd(bin_python, ('setup.py', 'bdist_wheel'),
+                      allow_fail=False, cwd=pkg_dir)
+        egg_info = os.path.join(pkg_dir, 'test_reqparse.egg-info')
 
         requires_txt = os.path.join(egg_info, 'requires.txt')
         with open(requires_txt, 'rt') as requires:
@@ -513,3 +732,20 @@ class TestRequirementParsing(base.BaseTestCase):
                 pkg_resources.split_sections(requires))
 
         self.assertEqual(expected_requirements, generated_requirements)
+
+
+def get_soabi():
+    soabi = None
+    try:
+        soabi = sysconfig.get_config_var('SOABI')
+    except IOError:
+        pass
+    if soabi is None and 'pypy' in sysconfig.get_scheme_names():
+        # NOTE(sigmavirus24): PyPy only added support for the SOABI config var
+        # to sysconfig in 2015. That was well after 2.2.1 was published in the
+        # Ubuntu 14.04 archive.
+        for suffix, _, _ in imp.get_suffixes():
+            if suffix.startswith('.pypy') and suffix.endswith('.so'):
+                soabi = suffix.split('.')[1]
+                break
+    return soabi
