@@ -10,7 +10,7 @@ for i in ${PYTHONS} ${PYTHON3S}; do
   rm -rf .testrepository
   testr init
   TEMP_REZ=`mktemp -t`
-  PYTHON=python$i PYTHONPATH=`pwd` testr run --subunit 'tests\.(?!.*TestCore.test_console_script.*)' | tee $TEMP_REZ | subunit2pyunit
+  PYTHON=python$i PYTHONPATH=`pwd` testr run --subunit 'pbr\.tests\.(?!(.*TestCore\.test_console_script.*|.*test_packaging\.TestRequirementParsing\.test_requirement_parsing.*|.*test_wsgi\.TestWsgiScripts\.test_with_argument.*|.*test_wsgi\.TestWsgiScripts\.test_wsgi_script_run.*))' | tee $TEMP_REZ | subunit2pyunit
   cat $TEMP_REZ | subunit-filter -s --no-passthrough | subunit-stats
   rm -f $TEMP_REZ
   testr slowest

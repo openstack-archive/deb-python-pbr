@@ -7,7 +7,7 @@ Uploaders: Thomas Goirand <zigo@debian.org>,
 Build-Depends: debhelper (>= 9),
                dh-python,
                git,
-               openstack-pkg-tools,
+               openstack-pkg-tools (>= 52~),
                python-all,
                python-all-dev,
                python-setuptools,
@@ -26,6 +26,7 @@ Build-Depends-Indep: python-coverage,
                      python-testscenarios,
                      python-testtools (>= 1.4.0),
                      python-virtualenv,
+                     python-wheel,
                      python3-fixtures (>= 0.3.14),
                      python3-markupsafe,
                      python3-mock (>= 1.3),
@@ -35,11 +36,12 @@ Build-Depends-Indep: python-coverage,
                      python3-testscenarios,
                      python3-testtools (>= 1.4.0),
                      python3-virtualenv,
+                     python3-wheel,
                      subunit (>= 1.1.0),
                      testrepository,
 Standards-Version: 3.9.6
-Vcs-Browser: https://anonscm.debian.org/cgit/openstack/python-pbr.git/
-Vcs-Git: https://anonscm.debian.org/git/openstack/python-pbr.git
+Vcs-Browser: https://git.openstack.org/cgit/openstack/deb-python-pbr
+Vcs-Git: https://git.openstack.org/openstack/deb-python-pbr
 Homepage: https://pypi.python.org/pypi/pbr
 XS-Testsuite: autopkgtest
 

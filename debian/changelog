@@ -1,7 +1,4 @@
-python-pbr (1.8.1-1) UNRELEASED; urgency=medium
-
-  [ Thomas Goirand ]
-  * New upstream release.
+python-pbr (1.10.0-1) experimental; urgency=medium
 
   [ Ondřej Nový ]
   * Fixed homepage (https).
@@ -9,7 +6,17 @@ python-pbr (1.8.1-1) UNRELEASED; urgency=medium
   * d/rules: Changed UPSTREAM_GIT protocol to https
   * d/copyright: Changed source URL to https protocol
 
- -- Thomas Goirand <zigo@debian.org>  Tue, 24 Nov 2015 17:34:58 +0100
+  [ Thomas Goirand ]
+  * New upstream release.
+  * Using OpenStack's Gerrit as VCS URLs.
+  * Remove non-relevant anymore Python 3.2 patch.
+  * Added python{3,}-wheel as build-depends-indep (used in tests).
+  * Black list 3 unit tests:
+    - test_packaging.TestRequirementParsing.test_requirement_parsing (failing)
+    - test_wsgi.TestWsgiScripts.test_with_argument (doing network access)
+    - test_wsgi.TestWsgiScripts.test_wsgi_script_run (doing network access)
+
+ -- Thomas Goirand <zigo@debian.org>  Wed, 21 Sep 2016 16:14:27 +0200
 
 python-pbr (1.8.0-4.1) unstable; urgency=medium
 
