@@ -16,7 +16,7 @@ python-pbr (1.10.0-1) unstable; urgency=medium
     - test_wsgi.TestWsgiScripts.test_with_argument (doing network access)
     - test_wsgi.TestWsgiScripts.test_wsgi_script_run (doing network access)
   * Fixed debian/copyright ordering.
-  * Add debian/source.lintian-overrides to supress warning:
+  * Add debian/source.lintian-overrides to suppress warning:
     build-depends-on-python-dev-with-no-arch-any (python-dev needed for tests).
   * Standards-Version: 3.9.8 (no change).
   * Updated long desc.

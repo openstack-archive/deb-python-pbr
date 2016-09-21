@@ -3,15 +3,6 @@ Upstream-Name: pbr
 Upstream-Contact: OpenStack Devel <openstack-dev@lists.openstack.org>
 Source: https://pypi.python.org/pypi/pbr
 
-Files: doc/source/static/nature.css doc/source/semver.rst
-Copyright: (c) 2007-2011, the Sphinx team
-License: BSD-2-clause
-
-Files: pbr/tests/testpackage/*
-Copyright: (c) 2013, Hewlett-Packard Development Company, L.P.
-           (c) 2013, Association of Universities for Research in Astronomy
-License: BSD-3-clause
-
 Files: *
 Copyright: 2011, OpenStack LLC.
  2011-2012, OpenStack Foundation
@@ -62,6 +53,15 @@ Copyright: 2011, OpenStack LLC.
  Yuriy Taraday <yorik.sar@gmail.com>
  Zhongyue Luo <zhongyue.nah@intel.com>
 License: Apache-2
+
+Files: doc/source/static/nature.css doc/source/semver.rst
+Copyright: (c) 2007-2011, the Sphinx team
+License: BSD-2-clause
+
+Files: pbr/tests/testpackage/*
+Copyright: (c) 2013, Hewlett-Packard Development Company, L.P.
+           (c) 2013, Association of Universities for Research in Astronomy
+License: BSD-3-clause
 
 Files: debian/*
 Copyright: (c) 2013, Thomas Goirand <zigo@debian.org>
