@@ -39,7 +39,7 @@ Build-Depends-Indep: python-coverage,
                      python3-wheel,
                      subunit (>= 1.1.0),
                      testrepository,
-Standards-Version: 3.9.6
+Standards-Version: 3.9.8
 Vcs-Browser: https://git.openstack.org/cgit/openstack/deb-python-pbr
 Vcs-Git: https://git.openstack.org/openstack/deb-python-pbr
 Homepage: https://pypi.python.org/pypi/pbr
@@ -69,9 +69,14 @@ Description: inject useful and sensible default behaviors into setuptools - Pyth
  already got the power of Python at your fingertips, so you don't really need
  PBR.
  .
- PBR builds on top of `d2to1` to provide for declarative configuration. It then
- filters the `setup.cfg` data through a setup hook to fill in default values
- and provide more sensible behaviors.
+ PBR builds on top of the work that d2to1 started to provide for declarative
+ configuration. d2to1 is itself an implementation of the ideas behind
+ distutils2. Although distutils2 is now abandoned in favor of work towards PEP
+ 426 and Metadata 2.0, declarative config is still a great idea and
+ specifically important in trying to distribute setup code as a library when
+ that library itself will alter how the setup is processed. As Metadata 2.0 and
+ other modern Python packaging PEPs come out, PBR aims to support them as
+ quickly as possible.
  .
  This package provides support for Python 2.x.
 
@@ -99,9 +104,14 @@ Description: inject useful and sensible default behaviors into setuptools - Pyth
  already got the power of Python at your fingertips, so you don't really need
  PBR.
  .
- PBR builds on top of `d2to1` to provide for declarative configuration. It then
- filters the `setup.cfg` data through a setup hook to fill in default values
- and provide more sensible behaviors.
+ PBR builds on top of the work that d2to1 started to provide for declarative
+ configuration. d2to1 is itself an implementation of the ideas behind
+ distutils2. Although distutils2 is now abandoned in favor of work towards PEP
+ 426 and Metadata 2.0, declarative config is still a great idea and
+ specifically important in trying to distribute setup code as a library when
+ that library itself will alter how the setup is processed. As Metadata 2.0 and
+ other modern Python packaging PEPs come out, PBR aims to support them as
+ quickly as possible.
  .
  This package provides support for Python 3.x.
 
@@ -127,8 +137,13 @@ Description: inject useful and sensible default behaviors into setuptools - doc
  already got the power of Python at your fingertips, so you don't really need
  PBR.
  .
- PBR builds on top of `d2to1` to provide for declarative configuration. It then
- filters the `setup.cfg` data through a setup hook to fill in default values
- and provide more sensible behaviors.
+ PBR builds on top of the work that d2to1 started to provide for declarative
+ configuration. d2to1 is itself an implementation of the ideas behind
+ distutils2. Although distutils2 is now abandoned in favor of work towards PEP
+ 426 and Metadata 2.0, declarative config is still a great idea and
+ specifically important in trying to distribute setup code as a library when
+ that library itself will alter how the setup is processed. As Metadata 2.0 and
+ other modern Python packaging PEPs come out, PBR aims to support them as
+ quickly as possible.
  .
  This package provides the documentation.

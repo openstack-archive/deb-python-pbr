@@ -14,17 +14,7 @@ override_dh_clean:
 	rm -rf .testrepository build __pycache__
 
 override_dh_auto_install:
-	set -e && for pyvers in $(PYTHONS); do \
-		python$$pyvers setup.py install --install-layout=deb \
-			--root $(CURDIR)/debian/python-pbr; \
-	done
-	mv $(CURDIR)/debian/python-pbr/usr/bin/pbr $(CURDIR)/debian/python-pbr/usr/bin/python2-pbr
-	set -e && for pyvers in $(PYTHON3S); do \
-		python$$pyvers setup.py install --install-layout=deb \
-			--root $(CURDIR)/debian/python3-pbr; \
-		rm -rf $(CURDIR)/debian/python3-pbr/usr/lib/python3/dist-packages/pbr/tests ; \
-	done
-	mv $(CURDIR)/debian/python3-pbr/usr/bin/pbr $(CURDIR)/debian/python3-pbr/usr/bin/python3-pbr
+	pkgos-dh_auto_install
 
 override_dh_python3:
 	dh_python3 --shebang=/usr/bin/python3
