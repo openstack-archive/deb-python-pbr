@@ -21,6 +21,7 @@ python-pbr (1.10.0-1) unstable; urgency=medium
   * Standards-Version: 3.9.8 (no change).
   * Updated long desc.
   * Using pkgos-dh_auto_install.
+  * Add gnupg as build-depends (Closes: #834684).
 
  -- Thomas Goirand <zigo@debian.org>  Wed, 21 Sep 2016 16:14:27 +0200
 
