@@ -1,4 +1,4 @@
-python-pbr (1.10.0-1) experimental; urgency=medium
+python-pbr (1.10.0-1) unstable; urgency=medium
 
   [ Ondřej Nový ]
   * Fixed homepage (https).
@@ -15,6 +15,12 @@ python-pbr (1.10.0-1) experimental; urgency=medium
     - test_packaging.TestRequirementParsing.test_requirement_parsing (failing)
     - test_wsgi.TestWsgiScripts.test_with_argument (doing network access)
     - test_wsgi.TestWsgiScripts.test_wsgi_script_run (doing network access)
+  * Fixed debian/copyright ordering.
+  * Add debian/source.lintian-overrides to supress warning:
+    build-depends-on-python-dev-with-no-arch-any (python-dev needed for tests).
+  * Standards-Version: 3.9.8 (no change).
+  * Updated long desc.
+  * Using pkgos-dh_auto_install.
 
  -- Thomas Goirand <zigo@debian.org>  Wed, 21 Sep 2016 16:14:27 +0200
 

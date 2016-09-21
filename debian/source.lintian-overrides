@@ -1,0 +1,2 @@
+# We need python-dev because of some unit tests
+python-pbr source: build-depends-on-python-dev-with-no-arch-any
