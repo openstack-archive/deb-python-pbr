@@ -41,8 +41,8 @@ Build-Depends-Indep: python-coverage,
                      subunit (>= 1.1.0),
                      testrepository,
 Standards-Version: 3.9.8
-Vcs-Browser: https://git.openstack.org/cgit/openstack/deb-python-pbr
-Vcs-Git: https://git.openstack.org/openstack/deb-python-pbr
+Vcs-Browser: https://git.openstack.org/cgit/openstack/deb-python-pbr?h=debian%2Fnewton
+Vcs-Git: https://git.openstack.org/openstack/deb-python-pbr -b debian/newton
 Homepage: https://pypi.python.org/pypi/pbr
 XS-Testsuite: autopkgtest
 
