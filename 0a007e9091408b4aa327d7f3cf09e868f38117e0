@@ -1,0 +1,8 @@
+Code-Review+2: Joshua Harlow <jxharlow@godaddy.com>
+Workflow+1: Joshua Harlow <jxharlow@godaddy.com>
+Verified+2: Jenkins
+Submitted-by: Jenkins
+Submitted-at: Fri, 30 Sep 2016 16:41:01 +0000
+Reviewed-on: https://review.openstack.org/377422
+Project: openstack/deb-python-pbr
+Branch: refs/heads/master
