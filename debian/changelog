@@ -1,4 +1,4 @@
-python-pbr (1.10.0-2) UNRELEASED; urgency=medium
+python-pbr (1.10.0-2) unstable; urgency=medium
 
   * d/s/options: extend-diff-ignore of .gitreview
   * d/control: Use correct branch in Vcs-* fields
