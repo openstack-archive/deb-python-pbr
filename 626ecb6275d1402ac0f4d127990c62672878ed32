@@ -1,0 +1,9 @@
+Code-Review+2: Sachi King <nakato@nakato.io>
+Code-Review+2: Davanum Srinivas (dims) <davanum@gmail.com>
+Workflow+1: Davanum Srinivas (dims) <davanum@gmail.com>
+Verified+2: Jenkins
+Submitted-by: Jenkins
+Submitted-at: Mon, 17 Oct 2016 16:25:36 +0000
+Reviewed-on: https://review.openstack.org/339392
+Project: openstack/deb-python-pbr
+Branch: refs/heads/master
