@@ -1,0 +1,8 @@
+Code-Review+2: Monty Taylor <mordred@inaugust.com>
+Workflow+1: Monty Taylor <mordred@inaugust.com>
+Verified+2: Jenkins
+Submitted-by: Jenkins
+Submitted-at: Thu, 13 Apr 2017 14:58:02 +0000
+Reviewed-on: https://review.openstack.org/455715
+Project: openstack/deb-python-pbr
+Branch: refs/heads/master
