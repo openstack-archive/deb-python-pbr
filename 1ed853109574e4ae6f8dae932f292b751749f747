@@ -1,0 +1,9 @@
+Code-Review+2: Monty Taylor <mordred@inaugust.com>
+Code-Review+2: Julien Danjou <julien@danjou.info>
+Workflow+1: ChangBo Guo(gcb) <glongwave@gmail.com>
+Verified+2: Jenkins
+Submitted-by: Jenkins
+Submitted-at: Sat, 15 Apr 2017 14:43:34 +0000
+Reviewed-on: https://review.openstack.org/456157
+Project: openstack/deb-python-pbr
+Branch: refs/heads/master
