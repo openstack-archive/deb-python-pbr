@@ -1,0 +1,9 @@
+Code-Review+2: Julien Danjou <julien@danjou.info>
+Code-Review+2: Doug Hellmann <doug@doughellmann.com>
+Workflow+1: Doug Hellmann <doug@doughellmann.com>
+Verified+2: Jenkins
+Submitted-by: Jenkins
+Submitted-at: Tue, 20 Jun 2017 16:19:43 +0000
+Reviewed-on: https://review.openstack.org/475790
+Project: openstack/deb-python-pbr
+Branch: refs/heads/master
