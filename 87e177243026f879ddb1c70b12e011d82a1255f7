@@ -1,0 +1,10 @@
+Code-Review+2: ChangBo Guo(gcb) <glongwave@gmail.com>
+Code-Review+1: Rajath Agasthya <rajagast@cisco.com>
+Code-Review+2: Davanum Srinivas (dims) <davanum@gmail.com>
+Workflow+1: Davanum Srinivas (dims) <davanum@gmail.com>
+Verified+2: Jenkins
+Submitted-by: Jenkins
+Submitted-at: Wed, 05 Jul 2017 12:36:08 +0000
+Reviewed-on: https://review.openstack.org/475382
+Project: openstack/deb-python-pbr
+Branch: refs/heads/master
