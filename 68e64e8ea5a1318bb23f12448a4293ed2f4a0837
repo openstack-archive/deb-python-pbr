@@ -1,0 +1,8 @@
+Code-Review+2: ChangBo Guo(gcb) <glongwave@gmail.com>
+Workflow+1: ChangBo Guo(gcb) <glongwave@gmail.com>
+Verified+2: Jenkins
+Submitted-by: Jenkins
+Submitted-at: Thu, 06 Jul 2017 08:12:33 +0000
+Reviewed-on: https://review.openstack.org/477909
+Project: openstack/deb-python-pbr
+Branch: refs/heads/master
